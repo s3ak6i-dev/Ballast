@@ -110,7 +110,7 @@
   .sim-stats b { font: 600 16px var(--mono); color: var(--ink); display: block; font-variant-numeric: tabular-nums; }
   .sim-stats .live b { color: var(--ok); } .sim-stats .fb b { color: var(--accent); }
   .sim-stats .saved b { color: var(--ink); }
-  #simlog { font: 12px/1.9 var(--mono); color: var(--muted); min-height: 58px; }
+  #simlog { font: 12px/1.9 var(--mono); color: var(--muted); min-height: 70px; }
   #simlog .crit { color: var(--crit); } #simlog .ok { color: var(--ok); }
   #simlog .warn { color: var(--warn); } #simlog .chaos { color: var(--chaos); }
 
@@ -557,17 +557,40 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
     },
   };
 
-  /* --- layout, dots, stats --- */
+  /* --- layout: node-editor bezier lanes, time-based motion --- */
   let W = 0, H = 0;
-  const P = () => ({
-    src:  { x: W * 0.08, y: H * 0.5 },
-    brk:  { x: W * 0.42, y: H * 0.5 },
-    api:  { x: W * 0.88, y: H * 0.30 },
-    fb:   { x: W * 0.88, y: H * 0.74 },
+  const NODE_H = 46;
+  const N = () => ({
+    src: { x: W * 0.10, y: H * 0.50, w: 94 },
+    brk: { x: W * 0.44, y: H * 0.50, w: 124 },
+    api: { x: W * 0.86, y: H * 0.28, w: 104 },
+    fb:  { x: W * 0.86, y: H * 0.76, w: 108 },
   });
+  function curve(a, b) {
+    // horizontal S-curve between node edges, like a node-graph editor
+    const p0 = { x: a.x + a.w / 2 + 6, y: a.y };
+    const p1 = { x: b.x - b.w / 2 - 6, y: b.y };
+    const dx = p1.x - p0.x;
+    return { p0, c1: { x: p0.x + dx * 0.45, y: p0.y }, c2: { x: p1.x - dx * 0.45, y: p1.y }, p1 };
+  }
+  const PATHS = () => {
+    const n = N();
+    return { toBrk: curve(n.src, n.brk), toApi: curve(n.brk, n.api), toFb: curve(n.brk, n.fb) };
+  };
+  const DUR = { toBrk: 1.15, toApi: 0.85, toFb: 0.85 }; // seconds per leg
+  function bez(c, t) {
+    const u = 1 - t;
+    return {
+      x: u * u * u * c.p0.x + 3 * u * u * t * c.c1.x + 3 * u * t * t * c.c2.x + t * t * t * c.p1.x,
+      y: u * u * u * c.p0.y + 3 * u * u * t * c.c1.y + 3 * u * t * t * c.c2.y + t * t * t * c.p1.y,
+    };
+  }
+  const ease = (t) => t * t * (3 - 2 * t); // smoothstep: gentle accel/decel
+
   let dots = [], apiUp = true, killedAt = 0, restoreTimer = null;
   const stats = { live: 0, fb: 0, failed: 0 };
-  let lastSpawn = 0;
+  const LANES = [-9, -4.5, 0, 4.5, 9]; // tidy parallel stream, not scatter
+  let laneIdx = 0, spawnAcc = 0, lastFrame = 0;
 
   const logEl = document.getElementById("simlog");
   function log(msg, cls) {
@@ -577,104 +600,125 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
     while (logEl.children.length > 3) logEl.removeChild(logEl.lastChild);
   }
 
-  function spawn(now) {
-    const p = P();
+  function spawn() {
     dots.push({
-      x: p.src.x, y: p.src.y + (Math.random() - 0.5) * H * 0.45,
-      leg: "toBrk", t: 0, lane: (Math.random() - 0.5) * 14, probe: false,
-      color: C.muted,
+      leg: "toBrk", t: 0, lane: LANES[laneIdx++ % LANES.length],
+      color: C.muted, done: false, fade: 1, x: -20, y: -20,
     });
-    lastSpawn = now;
   }
 
-  function step(dot, now) {
-    const p = P();
-    const speed = reduced ? 0.05 : 0.017;
-    dot.t += speed;
-    let from, to;
-    if (dot.leg === "toBrk") { from = { x: dot.x0 ?? p.src.x, y: dot.y }; to = p.brk; }
-    else if (dot.leg === "toApi") { from = p.brk; to = p.api; }
-    else { from = p.brk; to = p.fb; }
-
-    if (dot.t >= 1) {
-      dot.t = 0;
-      if (dot.leg === "toBrk") {
-        if (breaker.allow(now)) {
-          dot.leg = "toApi"; dot.probe = breaker.state === "half_open";
-          dot.color = dot.probe ? C.warn : C.muted;
-        } else {
-          dot.leg = "toFb"; dot.color = C.accent;
-        }
-      } else if (dot.leg === "toApi") {
-        const ok = apiUp;
-        breaker.record(ok, now);
-        if (ok) stats.live++; else stats.failed++;
-        dot.done = true; dot.flash = ok ? C.ok : C.crit;
+  function arrive(dot, now) {
+    if (dot.leg === "toBrk") {
+      if (breaker.allow(now)) {
+        dot.leg = "toApi"; dot.t = 0;
+        dot.color = breaker.state === "half_open" ? C.warn : C.muted;
       } else {
-        stats.fb++; dot.done = true; dot.flash = C.accent;
+        dot.leg = "toFb"; dot.t = 0; dot.color = C.accent;
       }
+    } else if (dot.leg === "toApi") {
+      const ok = apiUp;
+      breaker.record(ok, now);
+      if (ok) stats.live++; else stats.failed++;
+      dot.done = true; dot.color = ok ? C.ok : C.crit;
+    } else {
+      stats.fb++; dot.done = true; dot.color = C.accent;
+    }
+  }
+
+  function update(dot, dt, now, paths) {
+    if (dot.done) { dot.fade -= dt * 2.4; return; }
+    dot.t += dt / DUR[dot.leg];
+    const path = paths[dot.leg];
+    if (dot.t >= 1) {
+      const pos = bez(path, 1);
+      dot.x = pos.x; dot.y = pos.y + dot.lane;
+      arrive(dot, now);
       return;
     }
-    const yTarget = to.y + dot.lane;
-    dot.px = from.x + (to.x - from.x) * dot.t;
-    dot.py = (dot.leg === "toBrk" ? dot.y : from.y + dot.lane * 0.3) + (yTarget - (dot.leg === "toBrk" ? dot.y : from.y)) * dot.t;
+    const pos = bez(path, ease(dot.t));
+    dot.x = pos.x; dot.y = pos.y + dot.lane;
   }
 
-  function node(x, y, w, label, sub, color) {
-    ctx.fillStyle = "#1c1917"; ctx.strokeStyle = C.line; ctx.lineWidth = 1;
-    const h = 46, r = 8;
-    ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, r); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = color || C.ink; ctx.font = "600 11px ui-monospace, monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(label, x, y - 4);
-    ctx.fillStyle = C.faint; ctx.font = "10px ui-monospace, monospace";
-    ctx.fillText(sub, x, y + 12);
-  }
-
-  function lane(a, b, color, dashed) {
+  function strokeCurve(c, color, dashed) {
     ctx.strokeStyle = color; ctx.lineWidth = 1;
-    if (dashed) ctx.setLineDash([3, 5]);
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-    ctx.setLineDash([]);
+    if (dashed) ctx.setLineDash([2, 6]);
+    ctx.beginPath(); ctx.moveTo(c.p0.x, c.p0.y);
+    ctx.bezierCurveTo(c.c1.x, c.c1.y, c.c2.x, c.c2.y, c.p1.x, c.p1.y);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  function node(n, label, sub, color) {
+    ctx.fillStyle = "#1c1917"; ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(n.x - n.w / 2, n.y - NODE_H / 2, n.w, NODE_H, 9);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(n.x - n.w / 2 + 14, n.y, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = color; ctx.fill();
+    ctx.textAlign = "left";
+    ctx.fillStyle = C.ink; ctx.font = "600 11px ui-monospace, monospace";
+    ctx.fillText(label, n.x - n.w / 2 + 24, n.y - 3);
+    ctx.fillStyle = C.faint; ctx.font = "10px ui-monospace, monospace";
+    ctx.fillText(sub, n.x - n.w / 2 + 24, n.y + 11);
   }
 
   function draw(now) {
+    const dt = Math.min(0.05, (now - lastFrame) / 1000) || 0;
+    lastFrame = now;
     const dpr = devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     W = rect.width; H = rect.height;
-    if (canvas.width !== W * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; }
+    if (canvas.width !== Math.round(W * dpr)) { canvas.width = W * dpr; canvas.height = H * dpr; }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    const p = P();
+    const n = N(), paths = PATHS();
+    const open = breaker.state === "open";
 
-    lane(p.src, p.brk, "rgba(255,255,255,.06)");
-    lane(p.brk, p.api, breaker.state === "open" ? "rgba(217,82,74,.25)" : "rgba(255,255,255,.06)");
-    lane(p.brk, p.fb, breaker.state === "open" ? "rgba(232,96,44,.4)" : "rgba(255,255,255,.05)", true);
+    strokeCurve(paths.toBrk, "rgba(237,231,223,.07)");
+    strokeCurve(paths.toApi, open ? "rgba(217,82,74,.18)" : "rgba(237,231,223,.07)");
+    strokeCurve(paths.toFb, open ? "rgba(232,96,44,.45)" : "rgba(237,231,223,.05)", !open);
 
-    const stateColor = breaker.state === "closed" ? C.ok : breaker.state === "open" ? C.crit : C.warn;
-    node(p.src.x, p.src.y, 86, "AGENTS", "40 workers", C.ink);
-    node(p.brk.x, p.brk.y, 120, "BREAKER", breaker.state.replace("_", "-").toUpperCase(), stateColor);
-    node(p.api.x, p.api.y, 96, "LLM API", apiUp ? "healthy" : "DOWN", apiUp ? C.ok : C.crit);
-    node(p.fb.x, p.fb.y, 96, "FALLBACK", "cache · cheap", C.accent);
-
-    if (breaker.state === "open") {
-      const frac = Math.min(1, (now - breaker.openedAt) / breaker.cooldown);
-      ctx.strokeStyle = C.warn; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(p.brk.x + 70, p.brk.y - 16, 8, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
-      ctx.stroke();
+    spawnAcc += dt;
+    const interval = reduced ? 0.5 : 0.15;
+    while (spawnAcc >= interval) {
+      spawnAcc -= interval;
+      if (dots.length < 60) spawn();
     }
 
-    if (!reduced && now - lastSpawn > 120 && dots.length < 70) spawn(now);
-    if (reduced && now - lastSpawn > 400 && dots.length < 20) spawn(now);
-
-    dots = dots.filter((d) => !(d.done && (d.flashT = (d.flashT || 0) + 1) > 12));
+    dots = dots.filter((d) => d.fade > 0);
+    for (const d of dots) update(d, dt, now, paths);
     for (const d of dots) {
-      if (!d.done) step(d, now);
       ctx.beginPath();
-      ctx.arc(d.done ? d.px : d.px ?? d.x, d.done ? d.py : d.py ?? d.y, d.done ? 4 : 3, 0, Math.PI * 2);
-      ctx.fillStyle = d.done ? d.flash : d.color;
-      ctx.globalAlpha = d.done ? Math.max(0, 1 - d.flashT / 12) : 0.9;
-      ctx.fill(); ctx.globalAlpha = 1;
+      ctx.arc(d.x, d.y, d.done ? 3.6 : 2.8, 0, Math.PI * 2);
+      ctx.fillStyle = d.color;
+      ctx.globalAlpha = d.done ? Math.max(0, d.fade) : 0.92;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // nodes painted over the dots so arrivals tuck neatly under the cards
+    const stateColor = breaker.state === "closed" ? C.ok : open ? C.crit : C.warn;
+    node(n.src, "AGENTS", "40 workers", C.ink);
+    node(n.brk, "BREAKER", breaker.state.replace("_", "-").toUpperCase(), stateColor);
+    node(n.api, "LLM API", apiUp ? "healthy" : "DOWN", apiUp ? C.ok : C.crit);
+    node(n.fb, "FALLBACK", "cache · cheap", C.accent);
+
+    // live failure-rate meter under the breaker card
+    const rate = breaker.window.length
+      ? breaker.window.filter((x) => !x).length / breaker.window.length : 0;
+    const mw = 76, mx = n.brk.x - mw / 2, my = n.brk.y + NODE_H / 2 + 8;
+    ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.fillRect(mx, my, mw, 3);
+    if (rate > 0) {
+      ctx.fillStyle = rate > 0.35 ? C.crit : rate > 0.15 ? C.warn : C.ok;
+      ctx.fillRect(mx, my, mw * rate, 3);
+    }
+
+    // cooldown ring while open
+    if (open) {
+      const frac = Math.min(1, (now - breaker.openedAt) / breaker.cooldown);
+      ctx.strokeStyle = C.warn; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(n.brk.x + n.brk.w / 2 - 12, n.brk.y - NODE_H / 2 - 11, 7,
+              -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+      ctx.stroke();
     }
 
     document.getElementById("st-live").textContent = stats.live;
