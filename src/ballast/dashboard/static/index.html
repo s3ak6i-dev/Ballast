@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ballast — swarm health</title>
+<style>
+  :root {
+    --bg: #131110; --panel: #1c1917; --panel-2: #211d1a; --line: #2d2823;
+    --ink: #ede7df; --muted: #9c9187; --faint: #6f665e;
+    --accent: #e8602c; --accent-soft: rgba(232, 96, 44, .14);
+    --ok: #55a868; --warn: #d9a036; --crit: #d9524a; --chaos: #9b7bd9;
+    --blue: #6b9bd9;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 14px/1.45 system-ui, "Segoe UI", sans-serif;
+  }
+  a { color: var(--accent); }
+
+  header {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 24px; background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { font-weight: 650; font-size: 16px; letter-spacing: .02em; }
+  .brand b { color: var(--accent); font-weight: 650; }
+  .chip {
+    font: 11px/1 var(--mono); color: var(--muted);
+    border: 1px solid var(--line); border-radius: 3px; padding: 4px 7px;
+    letter-spacing: .05em;
+  }
+  #conn { display: inline-flex; align-items: center; gap: 6px; }
+  #conn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--crit); }
+  #conn.live .dot { background: var(--ok); }
+  header .spacer { flex: 1; }
+  button {
+    font: 600 13px/1 system-ui, sans-serif; cursor: pointer;
+    color: var(--ink); background: var(--accent); border: none;
+    border-radius: 4px; padding: 9px 14px;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:disabled { background: var(--panel-2); color: var(--muted); cursor: default; }
+  button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  button.quiet { background: transparent; border: 1px solid var(--line); color: var(--ink); font-weight: 500; }
+
+  .banner {
+    display: none; align-items: center; gap: 12px;
+    padding: 9px 24px; font-size: 13px; border-bottom: 1px solid var(--line);
+  }
+  .banner.show { display: flex; }
+  #banner-chaos  { background: rgba(155, 123, 217, .12); color: #c9b6ee; }
+  #banner-budget { background: rgba(217, 160, 54, .10); color: #e8c684; }
+  #banner-conn   { background: rgba(217, 82, 74, .10); color: #eba09a; }
+  .banner b { font-weight: 650; }
+  .banner .spacer { flex: 1; }
+
+  main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 48px; display: grid; gap: 16px; }
+
+  .label {
+    font: 600 10.5px/1 var(--mono); color: var(--faint);
+    text-transform: uppercase; letter-spacing: .12em;
+  }
+
+  .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  .tile {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    padding: 12px 14px 10px; display: grid; gap: 6px;
+  }
+  .tile .val { font: 600 24px/1.1 var(--mono); font-variant-numeric: tabular-nums; }
+  .tile .val .frac { color: var(--faint); font-size: 15px; font-weight: 500; }
+  .tile .sub { font-size: 11.5px; color: var(--muted); }
+  .tile canvas { width: 100%; height: 26px; display: block; }
+  .tile.warn .val { color: var(--warn); }
+  .tile.crit .val { color: var(--crit); }
+
+  .cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    padding: 14px; display: grid; gap: 10px;
+  }
+  .card.open { border-color: rgba(217, 82, 74, .55); }
+  .card.half_open { border-color: rgba(217, 160, 54, .5); }
+  .card header2 { display: flex; align-items: center; gap: 10px; }
+  .dep-name { font: 600 14px/1 var(--mono); flex: 1; }
+  .state {
+    font: 700 10px/1 var(--mono); letter-spacing: .1em; border-radius: 3px; padding: 4px 7px;
+  }
+  .state.closed    { color: #9fd3ac; background: rgba(85, 168, 104, .16); }
+  .state.open      { color: #f0a9a4; background: rgba(217, 82, 74, .18); }
+  .state.half_open { color: #ecca8e; background: rgba(217, 160, 54, .16); }
+  .fb-badge {
+    display: none; font: 600 10px/1 var(--mono); letter-spacing: .06em;
+    color: var(--accent); background: var(--accent-soft);
+    border-radius: 3px; padding: 4px 7px;
+  }
+  .fb-badge.show { display: inline-block; }
+  .meter { height: 5px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--ok); border-radius: 3px; width: 0; }
+  .meter i.warn { background: var(--warn); } .meter i.crit { background: var(--crit); }
+  .kv { display: flex; gap: 16px; font-size: 11.5px; color: var(--muted); }
+  .kv b { font: 600 12px var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  .charts { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 900px) { .charts { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; }
+  .panel .head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+  .panel .head .readout { margin-left: auto; font: 11.5px var(--mono); color: var(--muted); }
+  .legend { display: flex; gap: 12px; font-size: 11.5px; color: var(--muted); }
+  .legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  .panel canvas { width: 100%; height: 120px; display: block; }
+
+  #feed { list-style: none; margin: 0; padding: 0; max-height: 340px; overflow-y: auto; }
+  #feed li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 4px; border-bottom: 1px solid var(--line);
+    font-size: 12.5px;
+  }
+  #feed li:last-child { border-bottom: none; }
+  #feed .t { font: 11px var(--mono); color: var(--faint); min-width: 62px; }
+  #feed .sev { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  #feed .etype { font: 600 11.5px var(--mono); min-width: 130px; }
+  #feed .dep { color: var(--muted); font-family: var(--mono); font-size: 11.5px; min-width: 80px; }
+  #feed .detail { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  #feed .count { font: 600 10.5px var(--mono); color: var(--accent); }
+  .empty { color: var(--faint); padding: 18px 4px; font-size: 13px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(217,82,74,.5); } 100% { box-shadow: 0 0 0 14px rgba(217,82,74,0); } }
+    .card.just-tripped { animation: pulse .9s ease-out 1; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="brand"><b>◆</b> Ballast</span>
+  <span class="chip" id="session">session —</span>
+  <span class="chip">localhost · demo runtime · no auth</span>
+  <span class="chip" id="conn"><span class="dot"></span><span id="conn-text">connecting</span></span>
+  <span class="spacer"></span>
+  <button id="btn-demo">Run demo scenario</button>
+</header>
+
+<div class="banner" id="banner-chaos">
+  <b>Chaos active</b><span id="chaos-desc"></span>
+  <span class="spacer"></span>
+  <button class="quiet" id="btn-stop-chaos">Stop now</button>
+</div>
+<div class="banner" id="banner-budget">
+  <b>Hard budget ceiling reached</b><span>new calls are downgraded or refused</span>
+</div>
+<div class="banner" id="banner-conn">
+  <b>Live updates paused</b><span id="conn-age">reconnecting…</span>
+</div>
+
+<main>
+  <section class="tiles">
+    <div class="tile" id="tile-inflight">
+      <span class="label">In-flight</span>
+      <span class="val">0<span class="frac">/–</span></span>
+      <canvas></canvas>
+    </div>
+    <div class="tile" id="tile-queue">
+      <span class="label">Queue depth</span>
+      <span class="val">0<span class="frac">/–</span></span>
+      <canvas></canvas>
+    </div>
+    <div class="tile" id="tile-shed">
+      <span class="label">Requests shed</span>
+      <span class="val">0</span>
+      <span class="sub">total this session</span>
+    </div>
+    <div class="tile" id="tile-fallback">
+      <span class="label">Fallbacks served</span>
+      <span class="val">0</span>
+      <span class="sub">cache · cheaper model · static</span>
+    </div>
+    <div class="tile" id="tile-cost">
+      <span class="label">Cost burn</span>
+      <span class="val">$0.000</span>
+      <span class="sub" id="cost-sub">no budget set</span>
+      <canvas></canvas>
+    </div>
+  </section>
+
+  <section>
+    <div class="label" style="margin-bottom:10px">Dependencies</div>
+    <div class="cards" id="cards"><div class="empty">Waiting for first status tick…</div></div>
+  </section>
+
+  <section class="charts">
+    <div class="panel">
+      <div class="head">
+        <span class="label">Traffic</span>
+        <span class="legend"><span><i style="background:var(--accent)"></i>in-flight</span>
+        <span><i style="background:var(--blue)"></i>queue</span></span>
+        <span class="readout" id="readout-traffic"></span>
+      </div>
+      <canvas id="chart-traffic"></canvas>
+    </div>
+    <div class="panel">
+      <div class="head">
+        <span class="label">Cost (trailing hour)</span>
+        <span class="legend"><span><i style="background:var(--accent)"></i>spent</span>
+        <span><i style="background:var(--faint)"></i>hard ceiling</span></span>
+        <span class="readout" id="readout-cost"></span>
+      </div>
+      <canvas id="chart-cost"></canvas>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="head"><span class="label">Events</span>
+      <span class="readout" id="feed-note">live · queued events hidden</span></div>
+    <ul id="feed"></ul>
+    <div class="empty" id="feed-empty">Events appear when breakers trip, requests shed, or fallbacks fire.</div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const MAXPTS = 120; // 60s at 2 ticks/s
+const hist = { inflight: [], queue: [], cost: [] };
+const fallbackActive = {}; // dep -> last fallback ms
+let fallbackCount = 0;
+let lastStatus = null;
+
+const SEV = {
+  breaker_trip: "var(--crit)", breaker_close: "var(--ok)", breaker_half_open: "var(--warn)",
+  fallback_used: "var(--accent)", request_shed: "var(--crit)",
+  chaos_injected: "var(--chaos)", chaos_cleared: "var(--chaos)",
+  manual_override: "var(--muted)", budget_soft_ceiling: "var(--warn)",
+  budget_hard_ceiling: "var(--crit)",
+};
+
+function push(arr, v) { arr.push(v); if (arr.length > MAXPTS) arr.shift(); }
+function fmtTime(epoch) {
+  return new Date(epoch * 1000).toLocaleTimeString([], { hour12: false });
+}
+
+/* ---- websocket ---- */
+let disconnectedAt = null;
+function setConn(up) {
+  $("conn").classList.toggle("live", up);
+  $("conn-text").textContent = up ? "live" : "reconnecting";
+  $("banner-conn").classList.toggle("show", !up);
+  disconnectedAt = up ? null : (disconnectedAt || Date.now());
+}
+setInterval(() => {
+  if (disconnectedAt) {
+    $("conn-age").textContent =
+      "reconnecting… last data " + Math.round((Date.now() - disconnectedAt) / 1000) + "s ago";
+  }
+}, 1000);
+
+function connect() {
+  const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+  ws.onopen = () => setConn(true);
+  ws.onclose = () => { setConn(false); setTimeout(connect, 2000); };
+  ws.onerror = () => ws.close();
+  ws.onmessage = (msg) => tick(JSON.parse(msg.data));
+}
+
+/* ---- tick ---- */
+function tick(d) {
+  const s = d.status;
+  lastStatus = s;
+  $("session").textContent = "session " + s.session_id;
+  push(hist.inflight, s.backpressure.in_flight);
+  push(hist.queue, s.backpressure.queue_depth);
+  push(hist.cost, s.budget.spent_window_usd || 0);
+  d.events.forEach(handleEvent);
+  renderTiles(s);
+  renderCards(s);
+  renderBanners(s);
+  drawAll();
+  const btn = $("btn-demo");
+  btn.disabled = d.demo_running;
+  btn.textContent = d.demo_running ? "Demo running…" : "Run demo scenario";
+}
+
+/* ---- events ---- */
+let lastRow = null;
+function handleEvent(e) {
+  if (e.event_type === "request_queued") return;
+  if (e.event_type === "fallback_used") {
+    fallbackCount++;
+    if (e.dependency) fallbackActive[e.dependency] = Date.now();
+  }
+  if (e.event_type === "breaker_trip" && e.dependency) tripped[e.dependency] = Date.now();
+  addFeed(e);
+}
+
+const tripped = {};
+function addFeed(e) {
+  $("feed-empty").style.display = "none";
+  const now = Date.now();
+  if (lastRow && lastRow.type === e.event_type && lastRow.dep === e.dependency
+      && now - lastRow.at < 4000) {
+    lastRow.n++;
+    lastRow.el.querySelector(".count").textContent = "×" + lastRow.n;
+    lastRow.at = now;
+    return;
+  }
+  const li = document.createElement("li");
+  const detail = e.detail || {};
+  const parts = [];
+  if (detail.reason) parts.push(detail.reason);
+  if (detail.rung) parts.push("via " + detail.rung);
+  if (detail.kind) parts.push(detail.kind + (detail.value != null ? " " + detail.value : ""));
+  if (detail.failure_rate != null) parts.push("rate " + detail.failure_rate);
+  if (detail.cooldown_s != null) parts.push("cooldown " + detail.cooldown_s + "s");
+  li.innerHTML =
+    '<span class="t">' + fmtTime(e.timestamp) + '</span>' +
+    '<span class="sev" style="background:' + (SEV[e.event_type] || "var(--muted)") + '"></span>' +
+    '<span class="etype">' + e.event_type + '</span>' +
+    '<span class="dep">' + (e.dependency || "—") + '</span>' +
+    '<span class="detail">' + parts.join(" · ") + '</span>' +
+    '<span class="count"></span>';
+  const feed = $("feed");
+  feed.prepend(li);
+  while (feed.children.length > 80) feed.removeChild(feed.lastChild);
+  lastRow = { type: e.event_type, dep: e.dependency, n: 1, at: now, el: li };
+}
+
+/* ---- tiles ---- */
+function setTile(id, val, frac, sub) {
+  const tile = $(id);
+  tile.querySelector(".val").innerHTML =
+    val + (frac != null ? '<span class="frac">/' + frac + "</span>" : "");
+  if (sub != null && tile.querySelector(".sub")) tile.querySelector(".sub").textContent = sub;
+}
+function renderTiles(s) {
+  const bp = s.backpressure, b = s.budget;
+  setTile("tile-inflight", bp.in_flight, bp.max_concurrency);
+  setTile("tile-queue", bp.queue_depth, bp.max_queue_depth);
+  setTile("tile-shed", bp.shed_total, null);
+  setTile("tile-fallback", fallbackCount, null);
+  const spent = b.spent_window_usd || 0;
+  setTile("tile-cost", "$" + spent.toFixed(3), null,
+    b.enabled ? "budget $" + b.budget_usd_per_hour.toFixed(2) + "/hr" : "no budget set");
+  const costTile = $("tile-cost");
+  costTile.classList.toggle("warn", !!b.soft_exceeded && !b.hard_exceeded);
+  costTile.classList.toggle("crit", !!b.hard_exceeded);
+}
+
+/* ---- breaker cards ---- */
+function renderCards(s) {
+  const deps = Object.entries(s.dependencies);
+  const host = $("cards");
+  if (!deps.length) {
+    host.innerHTML = '<div class="empty">No dependencies yet — run the demo or wrap a call with @guarded.</div>';
+    return;
+  }
+  const order = { open: 0, half_open: 1, closed: 2 };
+  deps.sort((a, b2) => (order[a[1].state] - order[b2[1].state]) || a[0].localeCompare(b2[0]));
+  host.innerHTML = deps.map(([name, d]) => {
+    const w = d.window, rate = w.failure_rate || 0;
+    const meterClass = rate > 0.35 ? "crit" : rate > 0.15 ? "warn" : "";
+    const p95 = w.p95_latency_s != null ? (w.p95_latency_s * 1000).toFixed(0) + " ms" : "—";
+    const base = d.baseline_latency_s != null ? (d.baseline_latency_s * 1000).toFixed(0) + " ms" : "—";
+    const cool = d.cooldown_remaining_s != null ? d.cooldown_remaining_s.toFixed(1) + "s" : null;
+    const fb = fallbackActive[name] && Date.now() - fallbackActive[name] < 3000;
+    const fresh = tripped[name] && Date.now() - tripped[name] < 1200;
+    return '<div class="card ' + d.state + (fresh ? " just-tripped" : "") + '">' +
+      '<header2><span class="dep-name">' + name + '</span>' +
+      '<span class="fb-badge' + (fb ? " show" : "") + '">FALLBACK</span>' +
+      '<span class="state ' + d.state + '">' + d.state.replace("_", "-").toUpperCase() + "</span></header2>" +
+      '<div class="meter"><i class="' + meterClass + '" style="width:' + Math.min(100, rate * 100) + '%"></i></div>' +
+      '<div class="kv">' +
+        "<span>fail <b>" + (rate * 100).toFixed(0) + "%</b></span>" +
+        "<span>p95 <b>" + p95 + "</b></span>" +
+        "<span>base <b>" + base + "</b></span>" +
+        (cool ? "<span>retry in <b>" + cool + "</b></span>"
+              : "<span>window <b>" + w.calls + "</b></span>") +
+        (d.consecutive_trips ? "<span>trips <b>" + d.consecutive_trips + "</b></span>" : "") +
+      "</div></div>";
+  }).join("");
+}
+
+/* ---- banners ---- */
+function renderBanners(s) {
+  const active = s.chaos && s.chaos.active ? Object.entries(s.chaos.active) : [];
+  const on = active.length > 0;
+  $("banner-chaos").classList.toggle("show", on);
+  if (on) {
+    $("chaos-desc").textContent = active.map(([dep, rules]) =>
+      rules.map(r => r.kind + " " + r.value + " on " + dep + " — " + Math.max(0, r.remaining_s).toFixed(0) + "s left").join(", ")
+    ).join(" · ");
+  }
+  $("banner-budget").classList.toggle("show", !!(s.budget && s.budget.hard_exceeded));
+}
+
+/* ---- charts ---- */
+function sized(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const r = canvas.getBoundingClientRect();
+  if (canvas.width !== r.width * dpr) { canvas.width = r.width * dpr; canvas.height = r.height * dpr; }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return [ctx, r.width, r.height];
+}
+function drawSeries(canvas, seriesList, yMax, refLine) {
+  const [ctx, w, h] = sized(canvas);
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = "rgba(255,255,255,.05)";
+  ctx.lineWidth = 1;
+  for (let g = 1; g <= 2; g++) {
+    ctx.beginPath(); ctx.moveTo(0, h * g / 3); ctx.lineTo(w, h * g / 3); ctx.stroke();
+  }
+  if (refLine != null && yMax > 0) {
+    const y = h - 4 - (refLine / yMax) * (h - 10);
+    ctx.strokeStyle = "rgba(255,255,255,.22)";
+    ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  for (const s of seriesList) {
+    const data = s.data;
+    if (data.length < 2) continue;
+    const step = w / (MAXPTS - 1);
+    const x0 = w - (data.length - 1) * step;
+    const yOf = (v) => h - 4 - (yMax > 0 ? (v / yMax) * (h - 10) : 0);
+    if (s.fill) {
+      ctx.beginPath();
+      ctx.moveTo(x0, h);
+      data.forEach((v, i) => ctx.lineTo(x0 + i * step, yOf(v)));
+      ctx.lineTo(x0 + (data.length - 1) * step, h);
+      ctx.closePath();
+      ctx.fillStyle = s.fill;
+      ctx.fill();
+    }
+    ctx.beginPath();
+    data.forEach((v, i) => (i ? ctx.lineTo(x0 + i * step, yOf(v)) : ctx.moveTo(x0, yOf(v))));
+    ctx.strokeStyle = s.color; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.stroke();
+    const lastX = x0 + (data.length - 1) * step, lastY = yOf(data[data.length - 1]);
+    ctx.beginPath(); ctx.arc(lastX, lastY, 3, 0, Math.PI * 2); ctx.fillStyle = s.color; ctx.fill();
+  }
+}
+function drawAll() {
+  const trafficMax = Math.max(5, ...hist.inflight, ...hist.queue) * 1.15;
+  drawSeries($("chart-traffic"),
+    [{ data: hist.queue, color: "#6b9bd9" },
+     { data: hist.inflight, color: "#e8602c", fill: "rgba(232,96,44,.10)" }],
+    trafficMax, null);
+  const budget = lastStatus && lastStatus.budget.enabled ? lastStatus.budget.budget_usd_per_hour : null;
+  const costMax = Math.max(budget || 0, ...hist.cost, 0.001) * 1.15;
+  drawSeries($("chart-cost"),
+    [{ data: hist.cost, color: "#e8602c", fill: "rgba(232,96,44,.10)" }],
+    costMax, budget);
+  $("readout-traffic").textContent = hist.inflight.length
+    ? "now " + hist.inflight[hist.inflight.length - 1] + " in-flight, " + hist.queue[hist.queue.length - 1] + " queued" : "";
+  $("readout-cost").textContent = hist.cost.length
+    ? "$" + hist.cost[hist.cost.length - 1].toFixed(4) + " this hour" : "";
+}
+
+/* ---- actions ---- */
+$("btn-demo").addEventListener("click", () => {
+  fetch("/api/demo/start", { method: "POST" });
+});
+$("btn-stop-chaos").addEventListener("click", () => {
+  fetch("/api/chaos/clear", { method: "POST" });
+});
+
+/* ---- seed the feed with recent history, then go live ---- */
+fetch("/api/events?limit=25")
+  .then((r) => r.json())
+  .then((rows) => {
+    rows.reverse().forEach((row) => addFeed({
+      event_type: row.event_type, dependency: row.dependency,
+      detail: row.detail, timestamp: Date.parse(row.timestamp) / 1000,
+    }));
+  })
+  .catch(() => {});
+connect();
+</script>
+</body>
+</html>

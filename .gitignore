@@ -14,6 +14,10 @@ venv/
 .coverage
 htmlcov/
 
+# Runtime data
+ballast_events.db
+*.db
+
 # OS / editor
 .DS_Store
 Thumbs.db

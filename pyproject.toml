@@ -13,10 +13,14 @@ authors = [{ name = "Surya" }]
 keywords = ["agents", "resilience", "circuit-breaker", "backpressure", "chaos-engineering"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+dashboard = ["fastapi>=0.110", "uvicorn>=0.29"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+ballast = ["dashboard/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

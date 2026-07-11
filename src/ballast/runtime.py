@@ -14,9 +14,11 @@ from typing import Any
 from ._clock import Clock, monotonic
 from .backpressure import BackpressureController
 from .breaker import CircuitBreaker
+from .budget import BudgetTracker
 from .chaos import ChaosInjector
 from .config import BallastConfig, BreakerConfig
 from .events import Event, EventBus
+from .fallback import ResponseCache
 
 
 class Runtime:
@@ -42,6 +44,14 @@ class Runtime:
             clock=clock,
             emit=self.emit,
         )
+        self.budget = BudgetTracker(
+            self.config.budget_usd_per_hour,
+            self.config.budget_soft_margin,
+            self.config.budget_hard_behavior,
+            clock=clock,
+            emit=self.emit,
+        )
+        self.cache = ResponseCache(clock=clock)
         for name in self.config.dependencies:
             self.breaker(name)
 
@@ -78,7 +88,9 @@ class Runtime:
             "session_id": self.session_id,
             "dependencies": {name: b.status() for name, b in breakers.items()},
             "backpressure": self.controller.status(),
-            "chaos_enabled": self.config.chaos_active,
+            "budget": self.budget.status(),
+            "cache": self.cache.stats(),
+            "chaos": {"enabled": self.config.chaos_active, "active": self.chaos.active()},
         }
 
 
@@ -103,6 +115,8 @@ def configure(
     max_concurrency: int = 100,
     max_queue_depth: int = 500,
     budget_usd_per_hour: float | None = None,
+    budget_soft_margin: float = 0.8,
+    budget_hard_behavior: str = "downgrade",
     chaos_enabled: bool = False,
 ) -> Runtime:
     """Build and install a fresh runtime (TechSpec §5 API).
@@ -119,6 +133,8 @@ def configure(
         max_concurrency=max_concurrency,
         max_queue_depth=max_queue_depth,
         budget_usd_per_hour=budget_usd_per_hour,
+        budget_soft_margin=budget_soft_margin,
+        budget_hard_behavior=budget_hard_behavior,
         chaos_enabled=chaos_enabled,
     )
     with _runtime_lock:
@@ -135,3 +151,8 @@ def reset() -> None:
 
 def status() -> dict[str, Any]:
     return get_runtime().status()
+
+
+def record_cost(usd: float, dependency: str | None = None) -> None:
+    """Report spend against the budget (call after a metered API call)."""
+    get_runtime().budget.record(usd, dependency)

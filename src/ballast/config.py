@@ -62,6 +62,10 @@ class BallastConfig:
     max_queue_depth: int = 500
     #: Cost budget (P1). None disables budget logic.
     budget_usd_per_hour: float | None = None
+    #: Soft ceiling as a fraction of the budget: past it, eligible calls downgrade.
+    budget_soft_margin: float = 0.8
+    #: At the hard ceiling: "downgrade" forces the fallback chain, "refuse" raises.
+    budget_hard_behavior: str = "downgrade"
     #: Chaos injection master switch; BALLAST_CHAOS=1 in the environment also enables it.
     chaos_enabled: bool = False
     #: Breaker config applied to dependencies not listed explicitly.
@@ -74,6 +78,10 @@ class BallastConfig:
             raise ValueError("max_queue_depth must be >= 0")
         if self.budget_usd_per_hour is not None and self.budget_usd_per_hour <= 0:
             raise ValueError("budget_usd_per_hour must be > 0 or None")
+        if not 0.0 < self.budget_soft_margin < 1.0:
+            raise ValueError("budget_soft_margin must be in (0, 1)")
+        if self.budget_hard_behavior not in ("downgrade", "refuse"):
+            raise ValueError("budget_hard_behavior must be 'downgrade' or 'refuse'")
         for name, dep in self.dependencies.items():
             try:
                 dep.validate()

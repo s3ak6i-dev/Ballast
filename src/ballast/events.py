@@ -29,6 +29,8 @@ class EventType(StrEnum):
     CHAOS_INJECTED = "chaos_injected"
     CHAOS_CLEARED = "chaos_cleared"
     MANUAL_OVERRIDE = "manual_override"
+    BUDGET_SOFT_CEILING = "budget_soft_ceiling"
+    BUDGET_HARD_CEILING = "budget_hard_ceiling"
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +42,16 @@ class Event:
     #: Wall-clock time (epoch seconds) — for display/audit, not for breaker logic.
     timestamp: float = field(default_factory=time.time)
     session_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-safe form for the dashboard WebSocket and the event log."""
+        return {
+            "event_type": str(self.event_type),
+            "dependency": self.dependency,
+            "detail": self.detail,
+            "timestamp": self.timestamp,
+            "session_id": self.session_id,
+        }
 
 
 Subscriber = Callable[[Event], None]

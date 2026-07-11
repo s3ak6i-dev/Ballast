@@ -131,6 +131,26 @@ class ChaosInjector:
             result = self._corrupt(result)
         return result
 
+    # -- introspection (dashboard chaos banner) --------------------------------
+
+    def active(self) -> dict[str, list[dict[str, Any]]]:
+        """Snapshot of live rules: {dependency: [{kind, value, remaining_s}]}."""
+        now = self._clock()
+        with self._lock:
+            return {
+                dep: [
+                    {
+                        "kind": rule.kind,
+                        "value": rule.value,
+                        "remaining_s": round(rule.expires_at - now, 1),
+                    }
+                    for rule in rules.values()
+                    if rule.expires_at > now
+                ]
+                for dep, rules in self._rules.items()
+                if any(rule.expires_at > now for rule in rules.values())
+            }
+
     # -- scenarios ------------------------------------------------------------
 
     def scenario(self, name: str) -> "Scenario":
