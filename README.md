@@ -9,6 +9,10 @@
 
 **[Landing page & interactive demo →](https://s3ak6i-dev.github.io/Ballast/)** — kill a simulated API and watch the breaker trip, reroute, and recover, right in your browser.
 
+![Ballast dashboard during a live incident: chaos injects 85% failure, the mock_llm breaker trips and serves fallbacks, then probes recover and close](docs/assets/dashboard-demo.gif)
+
+*The dashboard during a real injected incident: breaker trips in milliseconds, fallbacks serve while it's open, half-open probes recover it — every event in the live feed.*
+
 Ballast sits between your agent orchestrator (LangGraph, CrewAI, AutoGen, custom loops) and everything it depends on — LLM APIs, tools, databases. It detects overload and failure in real time, absorbs traffic spikes with backpressure, and falls back to cheaper alternatives instead of hard-failing. A chaos-injection mode lets you **prove** your pipeline survives an outage instead of hoping it does — and a live dashboard shows the whole story as it happens.
 
 ```
