@@ -7,6 +7,8 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-9c9187)
 ![Status](https://img.shields.io/badge/status-M4%20complete-E8602C)
 
+**[Landing page & interactive demo →](https://s3ak6i-dev.github.io/Ballast/)** — kill a simulated API and watch the breaker trip, reroute, and recover, right in your browser.
+
 Ballast sits between your agent orchestrator (LangGraph, CrewAI, AutoGen, custom loops) and everything it depends on — LLM APIs, tools, databases. It detects overload and failure in real time, absorbs traffic spikes with backpressure, and falls back to cheaper alternatives instead of hard-failing. A chaos-injection mode lets you **prove** your pipeline survives an outage instead of hoping it does — and a live dashboard shows the whole story as it happens.
 
 ```

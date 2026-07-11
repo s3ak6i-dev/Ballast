@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ballast — circuit breakers &amp; chaos testing for AI agent swarms</title>
+<meta name="description" content="Ballast adds circuit breakers, backpressure, and cost-aware fallbacks to any AI agent pipeline — with chaos testing to prove they work. Drop-in Python decorator, live dashboard, zero rewrite.">
+<meta property="og:title" content="Ballast — your agent swarm will survive this">
+<meta property="og:description" content="Circuit breakers, backpressure, cost-aware fallbacks, and chaos testing for multi-agent AI systems. One decorator, no rewrite.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://s3ak6i-dev.github.io/Ballast/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,8 92,50 50,92 8,50' fill='%23E8602C'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #131110; --bg2: #171412; --panel: #1c1917; --panel-2: #211d1a;
+    --line: #2d2823; --line-2: #3a332c;
+    --ink: #ede7df; --muted: #9c9187; --faint: #6f665e;
+    --accent: #e8602c; --accent-dim: #b84a20; --accent-soft: rgba(232,96,44,.12);
+    --ok: #55a868; --warn: #d9a036; --crit: #d9524a; --chaos: #9b7bd9;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+    --body: system-ui, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.6 var(--body); }
+  ::selection { background: var(--accent); color: #fff; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1, h2, h3 { line-height: 1.15; text-wrap: balance; margin: 0; }
+  h1 { font: 650 clamp(30px, 5vw, 52px)/1.1 var(--mono); letter-spacing: -.02em; }
+  h2 { font: 650 clamp(22px, 3.2vw, 32px) var(--mono); letter-spacing: -.01em; }
+  h3 { font: 600 17px var(--body); }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+  section { padding: 72px 0; }
+  .eyebrow {
+    font: 600 11px var(--mono); color: var(--accent);
+    text-transform: uppercase; letter-spacing: .18em; margin-bottom: 14px;
+  }
+  .lede { color: var(--muted); max-width: 62ch; font-size: 17px; }
+  code, pre { font-family: var(--mono); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font: 600 14px var(--body); color: #fff; background: var(--accent);
+    border: none; border-radius: 6px; padding: 12px 20px; cursor: pointer;
+  }
+  .btn:hover { background: var(--accent-dim); text-decoration: none; }
+  .btn.ghost { background: transparent; border: 1px solid var(--line-2); color: var(--ink); }
+  .btn.ghost:hover { border-color: var(--faint); background: var(--panel); }
+  .btn:focus-visible, a:focus-visible, button:focus-visible,
+  input:focus-visible, label:focus-within {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  /* ---------- nav ---------- */
+  nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(19,17,16,.88); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  nav .wrap { display: flex; align-items: center; gap: 26px; height: 60px; }
+  .logo { font: 650 17px var(--mono); color: var(--ink); display: flex; gap: 8px; align-items: center; }
+  .logo b { color: var(--accent); font-weight: 650; }
+  nav .links { display: flex; gap: 22px; font-size: 13.5px; margin-left: auto; }
+  nav .links a { color: var(--muted); }
+  nav .links a:hover { color: var(--ink); text-decoration: none; }
+  nav .gh { font: 600 13px var(--body); color: var(--ink); border: 1px solid var(--line-2); border-radius: 6px; padding: 8px 14px; }
+  @media (max-width: 720px) { nav .links { display: none; } }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 72px 0 64px; background: radial-gradient(90% 60% at 50% 0%, #1b1512 0%, var(--bg) 70%); }
+  .hero .wrap { display: grid; gap: 36px; }
+  .hero-copy { max-width: 720px; }
+  .hero-copy p { color: var(--muted); font-size: 18px; max-width: 58ch; }
+  .install {
+    display: inline-flex; align-items: center; gap: 14px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 16px; font: 14px var(--mono);
+  }
+  .install .dollar { color: var(--faint); }
+  .install button {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font: 12px var(--mono); padding: 4px 6px;
+  }
+  .install button:hover { color: var(--ink); }
+  .hero-cta { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-top: 26px; }
+
+  /* ---------- simulator ---------- */
+  .sim {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px; display: grid; gap: 14px;
+  }
+  .sim-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .sim-title { font: 600 11px var(--mono); color: var(--faint); text-transform: uppercase; letter-spacing: .15em; }
+  .sim-badge {
+    display: none; font: 600 12px var(--mono); color: var(--ok);
+    background: rgba(85,168,104,.12); border-radius: 4px; padding: 5px 9px;
+  }
+  .sim-badge.show { display: inline-block; }
+  #kill {
+    margin-left: auto; font: 600 14px var(--body); color: #fff;
+    background: var(--crit); border: none; border-radius: 6px;
+    padding: 11px 18px; cursor: pointer; min-width: 168px;
+  }
+  #kill.restore { background: var(--ok); }
+  #kill:hover { filter: brightness(1.1); }
+  #simcanvas { width: 100%; height: 240px; display: block; border-radius: 8px; background: var(--bg2); }
+  .sim-stats { display: flex; gap: 26px; flex-wrap: wrap; }
+  .sim-stats div { font: 12.5px var(--body); color: var(--muted); }
+  .sim-stats b { font: 600 16px var(--mono); color: var(--ink); display: block; font-variant-numeric: tabular-nums; }
+  .sim-stats .live b { color: var(--ok); } .sim-stats .fb b { color: var(--accent); }
+  .sim-stats .saved b { color: var(--ink); }
+  #simlog { font: 12px/1.9 var(--mono); color: var(--muted); min-height: 58px; }
+  #simlog .crit { color: var(--crit); } #simlog .ok { color: var(--ok); }
+  #simlog .warn { color: var(--warn); } #simlog .chaos { color: var(--chaos); }
+
+  /* ---------- problem ---------- */
+  .grid3 { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 34px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 22px;
+  }
+  .card h3 { margin-bottom: 8px; }
+  .card p { color: var(--muted); font-size: 14.5px; margin: 0; }
+  .card .k { font: 600 11px var(--mono); color: var(--crit); text-transform: uppercase; letter-spacing: .12em; display: block; margin-bottom: 10px; }
+
+  /* ---------- steps ---------- */
+  .step { display: grid; gap: 28px; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: center; margin-top: 44px; }
+  @media (max-width: 820px) { .step { grid-template-columns: 1fr; } }
+  .step h3 { font: 600 20px var(--mono); margin-bottom: 8px; }
+  .step h3 span { color: var(--accent); margin-right: 10px; }
+  .step p { color: var(--muted); font-size: 15px; }
+  pre.code {
+    margin: 0; background: var(--bg2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px 20px; font-size: 13px; line-height: 1.65; overflow-x: auto;
+  }
+  .code .c { color: var(--faint); } .code .s { color: #c9a36b; }
+  .code .kw { color: var(--accent); } .code .fn { color: #8fb573; }
+  .code .crit { color: var(--crit); } .code .okc { color: var(--ok); }
+  .code .chaosc { color: var(--chaos); } .code .warnc { color: var(--warn); }
+
+  /* ---------- features ---------- */
+  .feat { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 34px; }
+  .feat .card b { font-family: var(--mono); font-size: 14.5px; }
+
+  /* ---------- chaos ---------- */
+  .chaos-band { background: var(--bg2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .term {
+    background: #0f0d0c; border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px 20px; font: 12.5px/1.8 var(--mono); margin-top: 30px; overflow-x: auto;
+  }
+  .term .row { opacity: 0; transform: translateY(4px); transition: opacity .4s, transform .4s; white-space: pre; }
+  .term .row.show { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .term .row { opacity: 1; transform: none; transition: none; }
+  }
+
+  /* ---------- wizard ---------- */
+  .wizard { display: grid; gap: 24px; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); margin-top: 36px; align-items: start; }
+  @media (max-width: 900px) { .wizard { grid-template-columns: 1fr; } }
+  .wizard .q { margin-bottom: 22px; }
+  .wizard .q > span { display: block; font: 600 12px var(--mono); color: var(--faint); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 10px; }
+  .opts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .opts label {
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+    font-size: 13.5px; color: var(--muted);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 13px;
+  }
+  .opts label:has(:checked) { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); }
+  .opts input { accent-color: var(--accent); margin: 0; }
+  .opts input[type="number"] {
+    width: 90px; background: var(--bg2); border: 1px solid var(--line); border-radius: 4px;
+    color: var(--ink); font: 13px var(--mono); padding: 6px 8px;
+  }
+  .genwrap { position: relative; }
+  #gencopy {
+    position: absolute; top: 12px; right: 12px;
+    font: 600 11.5px var(--mono); color: var(--muted); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 5px; padding: 6px 10px; cursor: pointer;
+  }
+  #gencopy:hover { color: var(--ink); }
+  #gen { min-height: 460px; }
+
+  /* ---------- faq ---------- */
+  details {
+    border-bottom: 1px solid var(--line); padding: 18px 4px;
+  }
+  details summary { cursor: pointer; font: 600 15.5px var(--body); list-style: none; display: flex; }
+  details summary::after { content: "+"; margin-left: auto; color: var(--accent); font: 400 20px var(--mono); }
+  details[open] summary::after { content: "–"; }
+  details p { color: var(--muted); font-size: 14.5px; max-width: 70ch; }
+
+  /* ---------- cta / footer ---------- */
+  .cta-band { text-align: center; background: var(--bg2); border-top: 1px solid var(--line); }
+  .cta-band .install { margin-top: 26px; }
+  footer { border-top: 1px solid var(--line); padding: 34px 0 44px; color: var(--faint); font-size: 13px; }
+  footer .wrap { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="logo" href="#"><b>◆</b> Ballast</a>
+    <div class="links">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#chaos">Chaos testing</a>
+      <a href="#start">Get started</a>
+      <a href="https://github.com/s3ak6i-dev/Ballast#readme">Docs</a>
+    </div>
+    <a class="gh" href="https://github.com/s3ak6i-dev/Ballast">GitHub ↗</a>
+  </div>
+</nav>
+
+<!-- ================= HERO ================= -->
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-copy">
+      <div class="eyebrow">Resilience for multi-agent AI systems</div>
+      <h1>Your agent swarm<br>will survive this.</h1>
+      <p>Ballast adds circuit breakers, backpressure, and cost-aware fallbacks to any
+         AI agent pipeline — and chaos testing to prove they work. One Python decorator.
+         No orchestrator rewrite.</p>
+      <div class="hero-cta">
+        <span class="install"><span class="dollar">$</span> pip install ballast
+          <button data-copy="pip install ballast" aria-label="Copy install command">copy</button></span>
+        <a class="btn ghost" href="https://github.com/s3ak6i-dev/Ballast">Star on GitHub</a>
+      </div>
+    </div>
+
+    <div class="sim" aria-label="Interactive circuit breaker demo">
+      <div class="sim-top">
+        <span class="sim-title">Live simulation — 40 agents · 1 flaky API</span>
+        <span class="sim-badge" id="detect"></span>
+        <button id="kill">💥 Kill the API</button>
+      </div>
+      <canvas id="simcanvas" height="240"></canvas>
+      <div class="sim-stats">
+        <div class="live"><b id="st-live">0</b>served live</div>
+        <div class="fb"><b id="st-fb">0</b>served by fallback</div>
+        <div class="saved"><b id="st-fail" style="color:var(--crit)">0</b>hard failures</div>
+        <div><b id="st-state" style="color:var(--ok)">CLOSED</b>breaker state</div>
+      </div>
+      <div id="simlog" aria-live="polite"></div>
+    </div>
+  </div>
+</header>
+
+<!-- ================= PROBLEM ================= -->
+<section>
+  <div class="wrap">
+    <div class="eyebrow">The problem</div>
+    <h2>One slow API can take down your whole swarm.</h2>
+    <p class="lede">Multi-agent systems ship with almost none of the hardening microservices
+       learned over 15 years. The failure modes are old; the ecosystem is new.</p>
+    <div class="grid3">
+      <div class="card"><span class="k">Cascading failure</span>
+        <h3>Retries pile up until everything dies</h3>
+        <p>One degraded tool makes every agent retry. Retries exhaust connections,
+           budgets, and patience — then the whole pipeline fails, not just the sick dependency.</p></div>
+      <div class="card"><span class="k">No backpressure</span>
+        <h3>Fan-outs hammer your dependencies</h3>
+        <p>A task spawns 50 agents; 50 agents hit one API at once. Nothing queues,
+           nothing sheds, nothing throttles — until the API does it for you, with 429s and bans.</p></div>
+      <div class="card"><span class="k">Uncontrolled cost</span>
+        <h3>Swarms burn budgets in minutes</h3>
+        <p>Every retry is a token bill. Without cost-aware routing, an incident isn't
+           just downtime — it's the most expensive hour of your month.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HOW ================= -->
+<section id="how" style="padding-top: 24px">
+  <div class="wrap">
+    <div class="eyebrow">How it works</div>
+    <h2>Wrap. Detect. Degrade.</h2>
+
+    <div class="step">
+      <div>
+        <h3><span>01</span>Wrap</h3>
+        <p>Decorate any call — a tool, an LLM API, a database query. That's the entire
+           integration. Works with LangGraph, CrewAI, AutoGen, or a plain agent loop.</p>
+      </div>
+      <pre class="code"><span class="kw">from</span> ballast <span class="kw">import</span> guarded
+
+<span class="kw">@guarded</span>(dependency=<span class="s">"openai_api"</span>, timeout=<span class="warnc">10</span>)
+<span class="kw">def</span> <span class="fn">call_llm</span>(prompt: str) -> str:
+    <span class="kw">return</span> client.chat.completions.create(...)</pre>
+    </div>
+
+    <div class="step">
+      <div>
+        <h3><span>02</span>Detect</h3>
+        <p>Every dependency gets a circuit breaker: a rolling window of failures and
+           latency versus a learned healthy baseline. When an API degrades, the breaker
+           trips in milliseconds — and stops your swarm from hammering a dying service.</p>
+      </div>
+      <pre class="code"><span class="c"># the event stream, live:</span>
+<span class="crit">breaker_trip</span>      openai_api  <span class="c">failure_rate=0.55, cooldown=10s</span>
+<span class="warnc">breaker_half_open</span> openai_api  <span class="c">probing recovery…</span>
+<span class="okc">breaker_close</span>     openai_api  <span class="c">probes_succeeded</span></pre>
+    </div>
+
+    <div class="step">
+      <div>
+        <h3><span>03</span>Degrade</h3>
+        <p>While the breaker is open, calls don't fail — they walk a fallback chain:
+           a cached answer, a cheaper model (when a rules-based classifier says it's safe),
+           or a static response. Your pipeline keeps moving, and it costs <em>less</em>
+           during the incident, not more.</p>
+      </div>
+      <pre class="code"><span class="kw">@guarded</span>(
+    dependency=<span class="s">"openai_api"</span>,
+    cache_ttl_s=<span class="warnc">300</span>,          <span class="c"># rung 1: recent identical answer</span>
+    cheaper=call_small_model, <span class="c"># rung 2: downgrade simple prompts</span>
+    fallback=<span class="s">"degraded"</span>,      <span class="c"># rung 3: static last resort</span>
+    cost_fn=<span class="kw">lambda</span> r: r.cost, <span class="c"># meter spend vs. your budget</span>
+)
+<span class="kw">def</span> <span class="fn">call_llm</span>(prompt: str) -> str: ...</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FEATURES ================= -->
+<section id="features" style="padding-top: 24px">
+  <div class="wrap">
+    <div class="eyebrow">What's in the box</div>
+    <h2>Distributed-systems hardening, agent-shaped.</h2>
+    <div class="feat">
+      <div class="card"><b>⚡ Per-dependency circuit breakers</b>
+        <p>Trip on failure rate or p95 latency vs. a learned baseline. Half-open probing,
+           exponential-backoff cooldowns, manual overrides.</p></div>
+      <div class="card"><b>🚦 Global backpressure</b>
+        <p>A concurrency ceiling with strict-FIFO queueing. Excess load queues, then sheds —
+           your system degrades instead of collapsing.</p></div>
+      <div class="card"><b>🪜 Fallback chain</b>
+        <p>Cache → cheaper model → static value → explicit error. Configured per dependency,
+           served automatically when the breaker opens.</p></div>
+      <div class="card"><b>🧮 Cost-aware routing</b>
+        <p>Rolling-hour budgets with soft and hard ceilings. Past the soft ceiling, simple
+           requests route to a cheaper model automatically.</p></div>
+      <div class="card"><b>💥 Chaos injection</b>
+        <p>Time-boxed failure, latency, and corruption rules against your real code path.
+           Your resilience demos double as CI tests.</p></div>
+      <div class="card"><b>📊 Live dashboard</b>
+        <p>Breaker states, traffic and cost charts, a coalescing event feed, and a one-click
+           built-in incident demo — over WebSocket, on localhost.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CHAOS ================= -->
+<section id="chaos" class="chaos-band">
+  <div class="wrap">
+    <div class="eyebrow" style="color: var(--chaos)">Chaos testing</div>
+    <h2>Don't claim resilience. Prove it.</h2>
+    <p class="lede">Everyone says their pipeline survives an outage. Ballast lets you kill a
+       dependency on purpose — in dev, time-boxed, against the real code path — and watch the
+       system detect, reroute, and recover. This is the actual output:</p>
+    <div class="term" id="term">
+      <div class="row">$ python examples/demo.py</div>
+      <div class="row" style="color:var(--chaos)">[  3.03s] &gt;&gt; CHAOS INJECTED   mock_api  {failure, 85%, 4s}</div>
+      <div class="row" style="color:var(--crit)">[  3.06s] !! BREAKER TRIP     mock_api  {failure_rate: 0.55}   ← detected in 0.02s</div>
+      <div class="row" style="color:var(--accent)">[  3.06s] -&gt; FALLBACK ACTIVE  mock_api  (serving cached responses)</div>
+      <div class="row" style="color:var(--warn)">[  5.06s] ?? HALF-OPEN        mock_api  probe failed → cooldown doubled</div>
+      <div class="row" style="color:var(--chaos)">[  9.06s] &lt;&lt; CHAOS CLEARED    mock_api  {expired}</div>
+      <div class="row" style="color:var(--ok)">[  9.11s] OK BREAKER CLOSE    mock_api  {probes_succeeded}</div>
+      <div class="row">&nbsp;</div>
+      <div class="row">calls: 10,466  |  live: 4,553  |  fallback: 5,901  |  errors: 12</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= WIZARD ================= -->
+<section id="start">
+  <div class="wrap">
+    <div class="eyebrow">Get started</div>
+    <h2>Your config, in 60 seconds.</h2>
+    <p class="lede">Answer five questions; copy the result into your project. That's the
+       whole integration.</p>
+
+    <div class="wizard">
+      <div>
+        <div class="q"><span>1 · What are you protecting?</span>
+          <div class="opts">
+            <label><input type="checkbox" id="w-llm" checked> LLM API</label>
+            <label><input type="checkbox" id="w-db"> Database</label>
+            <label><input type="checkbox" id="w-tools"> HTTP tools</label>
+          </div>
+        </div>
+        <div class="q"><span>2 · Which framework?</span>
+          <div class="opts">
+            <label><input type="radio" name="w-fw" value="langgraph" checked> LangGraph</label>
+            <label><input type="radio" name="w-fw" value="crewai"> CrewAI</label>
+            <label><input type="radio" name="w-fw" value="plain"> Plain Python</label>
+          </div>
+        </div>
+        <div class="q"><span>3 · How big is the swarm?</span>
+          <div class="opts">
+            <label><input type="radio" name="w-size" value="small"> Small (≤10 agents)</label>
+            <label><input type="radio" name="w-size" value="medium" checked> Medium (~50)</label>
+            <label><input type="radio" name="w-size" value="large"> Heavy (200+)</label>
+          </div>
+        </div>
+        <div class="q"><span>4 · Hourly cost budget?</span>
+          <div class="opts">
+            <label><input type="radio" name="w-budget" value="none"> No budget</label>
+            <label><input type="radio" name="w-budget" value="set" checked> $
+              <input type="number" id="w-usd" value="10" min="1" step="1" aria-label="budget dollars per hour"> /hr</label>
+          </div>
+        </div>
+        <div class="q"><span>5 · Fallbacks when things break?</span>
+          <div class="opts">
+            <label><input type="checkbox" id="w-cache" checked> Cached responses</label>
+            <label><input type="checkbox" id="w-cheaper" checked> Cheaper model</label>
+            <label><input type="checkbox" id="w-static"> Static value</label>
+          </div>
+        </div>
+      </div>
+      <div class="genwrap">
+        <button id="gencopy" data-copy-target="gen">copy</button>
+        <pre class="code" id="gen"></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FAQ ================= -->
+<section style="padding-top: 24px">
+  <div class="wrap" style="max-width: 820px">
+    <div class="eyebrow">Questions</div>
+    <h2>The honest FAQ.</h2>
+    <div style="margin-top: 26px">
+      <details>
+        <summary>How is this different from an LLM gateway (LiteLLM, Portkey, …)?</summary>
+        <p>Gateways proxy your LLM traffic and can retry or reroute <em>API requests</em>.
+           Ballast lives in-process with your orchestrator, so it can do what a proxy can't:
+           throttle agent fan-out with backpressure, guard non-LLM dependencies (databases,
+           tools), and chaos-test the whole pipeline. They compose — many teams will want both.</p>
+      </details>
+      <details>
+        <summary>What's the overhead on the happy path?</summary>
+        <p>A lock-protected counter check (backpressure), a breaker state read, and a window
+           append per call — microseconds, entirely in-process, no network hop. With chaos
+           disabled the injector is a plain pass-through.</p>
+      </details>
+      <details>
+        <summary>Does it support async?</summary>
+        <p>Not yet — the interceptor is sync/thread-based today. An <code>async def</code>
+           variant of <code>@guarded</code> is the top of the roadmap, since most agent
+           frameworks are asyncio-first.</p>
+      </details>
+      <details>
+        <summary>Is it production-ready?</summary>
+        <p>It's a well-tested v1 (81 deterministic tests) that's honest about its limits:
+           single-process in-memory state, sync-only, localhost dashboard with no auth.
+           Read the security section in the README before deploying anything.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CTA ================= -->
+<section class="cta-band">
+  <div class="wrap">
+    <h2>Give your swarm some ballast.</h2>
+    <p class="lede" style="margin: 14px auto 0">Clone it, run the built-in incident demo,
+       and watch a breaker trip and recover in your browser — no API keys required.</p>
+    <span class="install"><span class="dollar">$</span> pip install -e .[dashboard] &amp;&amp; python -m ballast.dashboard
+      <button data-copy="pip install -e .[dashboard] && python -m ballast.dashboard" aria-label="Copy dashboard command">copy</button></span>
+    <div class="hero-cta" style="justify-content: center">
+      <a class="btn" href="https://github.com/s3ak6i-dev/Ballast">View on GitHub</a>
+      <a class="btn ghost" href="https://github.com/s3ak6i-dev/Ballast#readme">Read the docs</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span><b style="color:var(--accent)">◆</b> Ballast — MIT licensed</span>
+    <a href="https://github.com/s3ak6i-dev/Ballast">GitHub</a>
+    <a href="https://github.com/s3ak6i-dev/Ballast/blob/main/TechSpec.md">Tech spec</a>
+    <a href="https://github.com/s3ak6i-dev/Ballast/blob/main/PRD.md">PRD</a>
+    <span style="margin-left:auto">Designed docs-first: PRD → TechSpec → UISpec → code.</span>
+  </div>
+</footer>
+
+<script>
+"use strict";
+/* ============ copy buttons ============ */
+document.querySelectorAll("[data-copy]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    navigator.clipboard.writeText(btn.getAttribute("data-copy"));
+    const old = btn.textContent; btn.textContent = "copied!";
+    setTimeout(() => (btn.textContent = old), 1200);
+  });
+});
+
+/* ============ hero simulator ============ */
+(() => {
+  const canvas = document.getElementById("simcanvas");
+  const ctx = canvas.getContext("2d");
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const C = {
+    ink: "#ede7df", muted: "#9c9187", faint: "#6f665e", line: "#2d2823",
+    accent: "#e8602c", ok: "#55a868", warn: "#d9a036", crit: "#d9524a",
+  };
+
+  /* --- a real (simplified) breaker: same semantics as the Python one --- */
+  const breaker = {
+    state: "closed", window: [], trips: 0, cooldown: 3000, openedAt: 0,
+    probesAllowed: 0, probeOk: 0,
+    allow(now) {
+      if (this.state === "closed") return true;
+      if (this.state === "open") {
+        if (now - this.openedAt >= this.cooldown) {
+          this.state = "half_open"; this.probesAllowed = 2; this.probeOk = 0;
+          log("?? HALF-OPEN — sending trial probes", "warn");
+          return true;
+        }
+        return false;
+      }
+      if (this.probesAllowed > 0) { this.probesAllowed--; return true; }
+      return false;
+    },
+    record(ok, now) {
+      if (this.state === "half_open") {
+        if (!ok) { this.trip(now, "probe failed"); return; }
+        if (++this.probeOk >= 3) {
+          this.state = "closed"; this.window = []; this.trips = 0; this.cooldown = 3000;
+          log("OK BREAKER CLOSE — probes succeeded, traffic restored", "ok");
+        } else { this.probesAllowed++; }
+        return;
+      }
+      if (this.state !== "closed") return;
+      this.window.push(ok);
+      if (this.window.length > 10) this.window.shift();
+      const fails = this.window.filter((x) => !x).length;
+      if (this.window.length >= 5 && fails / this.window.length > 0.5) {
+        this.trip(now, "failure rate " + Math.round(100 * fails / this.window.length) + "%");
+        if (killedAt) {
+          const dt = ((now - killedAt) / 1000).toFixed(2);
+          const badge = document.getElementById("detect");
+          badge.textContent = "detected in " + dt + "s"; badge.classList.add("show");
+        }
+      }
+    },
+    trip(now, why) {
+      this.trips++;
+      this.cooldown = Math.min(3000 * 2 ** (this.trips - 1), 12000);
+      this.state = "open"; this.openedAt = now; this.window = [];
+      log("!! BREAKER TRIP — " + why + " → open for " + this.cooldown / 1000 + "s", "crit");
+    },
+  };
+
+  /* --- layout, dots, stats --- */
+  let W = 0, H = 0;
+  const P = () => ({
+    src:  { x: W * 0.08, y: H * 0.5 },
+    brk:  { x: W * 0.42, y: H * 0.5 },
+    api:  { x: W * 0.88, y: H * 0.30 },
+    fb:   { x: W * 0.88, y: H * 0.74 },
+  });
+  let dots = [], apiUp = true, killedAt = 0, restoreTimer = null;
+  const stats = { live: 0, fb: 0, failed: 0 };
+  let lastSpawn = 0;
+
+  const logEl = document.getElementById("simlog");
+  function log(msg, cls) {
+    const line = document.createElement("div");
+    line.className = cls || ""; line.textContent = msg;
+    logEl.prepend(line);
+    while (logEl.children.length > 3) logEl.removeChild(logEl.lastChild);
+  }
+
+  function spawn(now) {
+    const p = P();
+    dots.push({
+      x: p.src.x, y: p.src.y + (Math.random() - 0.5) * H * 0.45,
+      leg: "toBrk", t: 0, lane: (Math.random() - 0.5) * 14, probe: false,
+      color: C.muted,
+    });
+    lastSpawn = now;
+  }
+
+  function step(dot, now) {
+    const p = P();
+    const speed = reduced ? 0.05 : 0.017;
+    dot.t += speed;
+    let from, to;
+    if (dot.leg === "toBrk") { from = { x: dot.x0 ?? p.src.x, y: dot.y }; to = p.brk; }
+    else if (dot.leg === "toApi") { from = p.brk; to = p.api; }
+    else { from = p.brk; to = p.fb; }
+
+    if (dot.t >= 1) {
+      dot.t = 0;
+      if (dot.leg === "toBrk") {
+        if (breaker.allow(now)) {
+          dot.leg = "toApi"; dot.probe = breaker.state === "half_open";
+          dot.color = dot.probe ? C.warn : C.muted;
+        } else {
+          dot.leg = "toFb"; dot.color = C.accent;
+        }
+      } else if (dot.leg === "toApi") {
+        const ok = apiUp;
+        breaker.record(ok, now);
+        if (ok) stats.live++; else stats.failed++;
+        dot.done = true; dot.flash = ok ? C.ok : C.crit;
+      } else {
+        stats.fb++; dot.done = true; dot.flash = C.accent;
+      }
+      return;
+    }
+    const yTarget = to.y + dot.lane;
+    dot.px = from.x + (to.x - from.x) * dot.t;
+    dot.py = (dot.leg === "toBrk" ? dot.y : from.y + dot.lane * 0.3) + (yTarget - (dot.leg === "toBrk" ? dot.y : from.y)) * dot.t;
+  }
+
+  function node(x, y, w, label, sub, color) {
+    ctx.fillStyle = "#1c1917"; ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+    const h = 46, r = 8;
+    ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, r); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = color || C.ink; ctx.font = "600 11px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(label, x, y - 4);
+    ctx.fillStyle = C.faint; ctx.font = "10px ui-monospace, monospace";
+    ctx.fillText(sub, x, y + 12);
+  }
+
+  function lane(a, b, color, dashed) {
+    ctx.strokeStyle = color; ctx.lineWidth = 1;
+    if (dashed) ctx.setLineDash([3, 5]);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function draw(now) {
+    const dpr = devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    W = rect.width; H = rect.height;
+    if (canvas.width !== W * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const p = P();
+
+    lane(p.src, p.brk, "rgba(255,255,255,.06)");
+    lane(p.brk, p.api, breaker.state === "open" ? "rgba(217,82,74,.25)" : "rgba(255,255,255,.06)");
+    lane(p.brk, p.fb, breaker.state === "open" ? "rgba(232,96,44,.4)" : "rgba(255,255,255,.05)", true);
+
+    const stateColor = breaker.state === "closed" ? C.ok : breaker.state === "open" ? C.crit : C.warn;
+    node(p.src.x, p.src.y, 86, "AGENTS", "40 workers", C.ink);
+    node(p.brk.x, p.brk.y, 120, "BREAKER", breaker.state.replace("_", "-").toUpperCase(), stateColor);
+    node(p.api.x, p.api.y, 96, "LLM API", apiUp ? "healthy" : "DOWN", apiUp ? C.ok : C.crit);
+    node(p.fb.x, p.fb.y, 96, "FALLBACK", "cache · cheap", C.accent);
+
+    if (breaker.state === "open") {
+      const frac = Math.min(1, (now - breaker.openedAt) / breaker.cooldown);
+      ctx.strokeStyle = C.warn; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.brk.x + 70, p.brk.y - 16, 8, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+      ctx.stroke();
+    }
+
+    if (!reduced && now - lastSpawn > 120 && dots.length < 70) spawn(now);
+    if (reduced && now - lastSpawn > 400 && dots.length < 20) spawn(now);
+
+    dots = dots.filter((d) => !(d.done && (d.flashT = (d.flashT || 0) + 1) > 12));
+    for (const d of dots) {
+      if (!d.done) step(d, now);
+      ctx.beginPath();
+      ctx.arc(d.done ? d.px : d.px ?? d.x, d.done ? d.py : d.py ?? d.y, d.done ? 4 : 3, 0, Math.PI * 2);
+      ctx.fillStyle = d.done ? d.flash : d.color;
+      ctx.globalAlpha = d.done ? Math.max(0, 1 - d.flashT / 12) : 0.9;
+      ctx.fill(); ctx.globalAlpha = 1;
+    }
+
+    document.getElementById("st-live").textContent = stats.live;
+    document.getElementById("st-fb").textContent = stats.fb;
+    document.getElementById("st-fail").textContent = stats.failed;
+    const st = document.getElementById("st-state");
+    st.textContent = breaker.state.replace("_", "-").toUpperCase();
+    st.style.color = stateColor;
+
+    requestAnimationFrame(draw);
+  }
+
+  const killBtn = document.getElementById("kill");
+  function setApi(up, auto) {
+    apiUp = up;
+    if (!up) {
+      killedAt = performance.now();
+      log(">> CHAOS: API killed — 100% failure injected", "chaos");
+      killBtn.textContent = "Restore API"; killBtn.classList.add("restore");
+      restoreTimer = setTimeout(() => setApi(true, true), 9000);
+    } else {
+      clearTimeout(restoreTimer);
+      log("<< CHAOS CLEARED — API healthy again" + (auto ? " (auto-restore)" : ""), "chaos");
+      killBtn.textContent = "💥 Kill the API"; killBtn.classList.remove("restore");
+      killedAt = 0;
+    }
+  }
+  killBtn.addEventListener("click", () => setApi(!apiUp, false));
+
+  log("40 agents calling one API through a Ballast breaker. Try killing it.", "");
+  requestAnimationFrame(draw);
+})();
+
+/* ============ chaos terminal reveal ============ */
+(() => {
+  const rows = document.querySelectorAll("#term .row");
+  const io = new IntersectionObserver((entries) => {
+    if (!entries[0].isIntersecting) return;
+    rows.forEach((row, i) => setTimeout(() => row.classList.add("show"), i * 350));
+    io.disconnect();
+  }, { threshold: 0.4 });
+  io.observe(document.getElementById("term"));
+})();
+
+/* ============ config wizard ============ */
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const checked = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
+  const SIZES = { small: [20, 100], medium: [50, 250], large: [200, 1000] };
+  const FW = {
+    langgraph: "# wrap the function your LangGraph node calls",
+    crewai: "# wrap your CrewAI tool's _run method",
+    plain: "# wrap any callable in your agent loop",
+  };
+
+  function generate() {
+    const deps = [];
+    if ($("w-llm").checked) deps.push('        "llm_api":     {"failure_threshold": 0.5, "latency_multiplier": 3, "cooldown_s": 10},');
+    if ($("w-db").checked) deps.push('        "database":    {"failure_threshold": 0.3, "latency_multiplier": 2, "cooldown_s": 5},');
+    if ($("w-tools").checked) deps.push('        "http_tools":  {"failure_threshold": 0.5, "latency_multiplier": 3, "cooldown_s": 10},');
+    if (!deps.length) deps.push('        # pick at least one dependency above');
+    const [conc, queue] = SIZES[checked("w-size")];
+    const budget = checked("w-budget") === "set" ? Number($("w-usd").value) || 10 : null;
+
+    const g = [];
+    g.push('    dependency="llm_api",', "    timeout=15,");
+    if ($("w-cache").checked) g.push("    cache_ttl_s=300,             # fallback rung 1: cached answers");
+    if ($("w-cheaper").checked) g.push("    cheaper=call_smaller_model,  # rung 2: downgrade simple prompts");
+    if ($("w-static").checked) g.push('    fallback="Service degraded — please retry shortly.",');
+    if (budget !== null) g.push("    cost_fn=lambda r: 0.01,      # report each call's cost");
+
+    const lines = [
+      "import ballast",
+      "from ballast import guarded",
+      "",
+      "ballast.configure(",
+      "    dependencies={",
+      ...deps,
+      "    },",
+      `    max_concurrency=${conc},`,
+      `    max_queue_depth=${queue},`,
+      ...(budget !== null
+        ? [`    budget_usd_per_hour=${budget.toFixed(1)},   # soft ceiling at 80%`]
+        : []),
+      ")",
+      "",
+      FW[checked("w-fw")],
+      "@guarded(",
+      ...g,
+      ")",
+      "def call_llm(prompt: str) -> str:",
+      "    ...",
+      "",
+      "# prove it works before production does it for you:",
+      '# BALLAST_CHAOS=1 → ballast.chaos.scenario("api_outage").run("llm_api", 30)',
+    ];
+    $("gen").textContent = lines.join("\n");
+  }
+
+  document.querySelectorAll("#start input").forEach((el) => el.addEventListener("input", generate));
+  $("gencopy").addEventListener("click", () => {
+    navigator.clipboard.writeText($("gen").textContent);
+    $("gencopy").textContent = "copied!";
+    setTimeout(() => ($("gencopy").textContent = "copy"), 1200);
+  });
+  generate();
+})();
+</script>
+</body>
+</html>
