@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ballast-agents"          # PyPI distribution name; the import is `ballast`
-version = "0.1.0"
+version = "0.1.1"
 description = "Resilience and cost-control plane for multi-agent AI systems: circuit breakers, backpressure, cost-aware fallbacks, and chaos testing"
 readme = "README.md"
 requires-python = ">=3.11"

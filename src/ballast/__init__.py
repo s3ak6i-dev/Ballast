@@ -42,7 +42,7 @@ from .runtime import Runtime, configure, get_runtime, record_cost, reset, status
 if TYPE_CHECKING:
     from .chaos import ChaosInjector
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "configure",
