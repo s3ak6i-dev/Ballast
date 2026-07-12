@@ -10,203 +10,396 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://s3ak6i-dev.github.io/Ballast/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,8 92,50 50,92 8,50' fill='%23E8602C'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #131110; --bg2: #171412; --panel: #1c1917; --panel-2: #211d1a;
-    --line: #2d2823; --line-2: #3a332c;
-    --ink: #ede7df; --muted: #9c9187; --faint: #6f665e;
-    --accent: #e8602c; --accent-dim: #b84a20; --accent-soft: rgba(232,96,44,.12);
-    --ok: #55a868; --warn: #d9a036; --crit: #d9524a; --chaos: #9b7bd9;
-    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+    --bg: #0d0b0a; --bg-2: #121010; --panel: rgba(255,255,255,.024);
+    --panel-solid: #161311;
+    --line: rgba(255,255,255,.08); --line-2: rgba(255,255,255,.15);
+    --ink: #f2ece4; --muted: #a59c92; --faint: #6f675f;
+    --accent: #e8602c; --accent-2: #ff8a50;
+    --ok: #57ab6b; --warn: #d9a036; --crit: #d9524a; --chaos: #9b7bd9;
+    --ease: cubic-bezier(.16, 1, .3, 1);
+    --display: "Bricolage Grotesque", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
     --body: system-ui, "Segoe UI", sans-serif;
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   html, body { margin: 0; }
-  body { background: var(--bg); color: var(--ink); font: 16px/1.6 var(--body); }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.65 var(--body);
+    overflow-x: hidden;
+  }
+  /* ambient dot grid, faded at the edges */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image: radial-gradient(rgba(255,255,255,.045) 1px, transparent 1px);
+    background-size: 30px 30px;
+    -webkit-mask-image: radial-gradient(120% 60% at 50% 0%, #000 0%, transparent 75%);
+            mask-image: radial-gradient(120% 60% at 50% 0%, #000 0%, transparent 75%);
+  }
   ::selection { background: var(--accent); color: #fff; }
-  a { color: var(--accent); text-decoration: none; }
+  a { color: var(--accent-2); text-decoration: none; }
   a:hover { text-decoration: underline; }
-  h1, h2, h3 { line-height: 1.15; text-wrap: balance; margin: 0; }
-  h1 { font: 650 clamp(30px, 5vw, 52px)/1.1 var(--mono); letter-spacing: -.02em; }
-  h2 { font: 650 clamp(22px, 3.2vw, 32px) var(--mono); letter-spacing: -.01em; }
-  h3 { font: 600 17px var(--body); }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
-  section { padding: 72px 0; }
+  h1, h2, h3 { line-height: 1.06; text-wrap: balance; margin: 0; font-family: var(--display); }
+  h1 { font-size: clamp(42px, 6.4vw, 76px); font-weight: 700; letter-spacing: -.035em; }
+  h2 { font-size: clamp(28px, 3.8vw, 44px); font-weight: 650; letter-spacing: -.025em; }
+  h3 { font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 28px; position: relative; z-index: 1; }
+  section { padding: 110px 0; position: relative; }
   .eyebrow {
-    font: 600 11px var(--mono); color: var(--accent);
-    text-transform: uppercase; letter-spacing: .18em; margin-bottom: 14px;
+    display: inline-flex; align-items: center; gap: 10px;
+    font: 600 11.5px var(--mono); color: var(--accent-2);
+    text-transform: uppercase; letter-spacing: .22em; margin-bottom: 20px;
   }
-  .lede { color: var(--muted); max-width: 62ch; font-size: 17px; }
-  code, pre { font-family: var(--mono); }
+  .eyebrow::before { content: ""; width: 24px; height: 1px; background: var(--accent); }
+  .lede { color: var(--muted); max-width: 60ch; font-size: 17.5px; margin-top: 18px; }
+  code { font-family: var(--mono); font-size: .92em; }
+
+  /* ---------- reveal-on-scroll ---------- */
+  [data-reveal] {
+    opacity: 0; transform: translateY(26px);
+    transition: opacity .9s var(--ease), transform .9s var(--ease);
+    transition-delay: calc(var(--i, 0) * 90ms);
+  }
+  [data-reveal].in { opacity: 1; transform: none; }
+
+  /* ---------- buttons ---------- */
   .btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    font: 600 14px var(--body); color: #fff; background: var(--accent);
-    border: none; border-radius: 6px; padding: 12px 20px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 9px;
+    font: 600 14.5px var(--body); color: #fff; cursor: pointer;
+    background: linear-gradient(180deg, #f0703c, #d4501f);
+    border: none; border-radius: 10px; padding: 13px 22px;
+    box-shadow: 0 0 0 1px rgba(232,96,44,.35), 0 10px 30px -10px rgba(232,96,44,.55);
+    transition: transform .35s var(--ease), box-shadow .35s var(--ease), filter .2s;
   }
-  .btn:hover { background: var(--accent-dim); text-decoration: none; }
-  .btn.ghost { background: transparent; border: 1px solid var(--line-2); color: var(--ink); }
-  .btn.ghost:hover { border-color: var(--faint); background: var(--panel); }
-  .btn:focus-visible, a:focus-visible, button:focus-visible,
-  input:focus-visible, label:focus-within {
-    outline: 2px solid var(--accent); outline-offset: 2px;
+  .btn:hover {
+    transform: translateY(-2px); text-decoration: none;
+    box-shadow: 0 0 0 1px rgba(232,96,44,.5), 0 18px 40px -12px rgba(232,96,44,.65);
   }
+  .btn .arrow { transition: transform .35s var(--ease); }
+  .btn:hover .arrow { transform: translateX(3px); }
+  .btn.ghost {
+    background: rgba(255,255,255,.03); color: var(--ink);
+    box-shadow: 0 0 0 1px var(--line-2);
+  }
+  .btn.ghost:hover { box-shadow: 0 0 0 1px rgba(255,255,255,.28); background: rgba(255,255,255,.06); }
+  .btn:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 3px; }
 
-  /* ---------- nav ---------- */
-  nav {
-    position: sticky; top: 0; z-index: 50;
-    background: rgba(19,17,16,.88); backdrop-filter: blur(8px);
-    border-bottom: 1px solid var(--line);
-  }
-  nav .wrap { display: flex; align-items: center; gap: 26px; height: 60px; }
-  .logo { font: 650 17px var(--mono); color: var(--ink); display: flex; gap: 8px; align-items: center; }
-  .logo b { color: var(--accent); font-weight: 650; }
-  nav .links { display: flex; gap: 22px; font-size: 13.5px; margin-left: auto; }
-  nav .links a { color: var(--muted); }
-  nav .links a:hover { color: var(--ink); text-decoration: none; }
-  nav .gh { font: 600 13px var(--body); color: var(--ink); border: 1px solid var(--line-2); border-radius: 6px; padding: 8px 14px; }
-  @media (max-width: 720px) { nav .links { display: none; } }
-
-  /* ---------- hero ---------- */
-  .hero { padding: 72px 0 64px; background: radial-gradient(90% 60% at 50% 0%, #1b1512 0%, var(--bg) 70%); }
-  .hero .wrap { display: grid; gap: 36px; }
-  .hero-copy { max-width: 720px; }
-  .hero-copy p { color: var(--muted); font-size: 18px; max-width: 58ch; }
   .install {
     display: inline-flex; align-items: center; gap: 14px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
-    padding: 12px 16px; font: 14px var(--mono);
+    background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 10px;
+    padding: 13px 18px; font: 500 14px var(--mono);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
   }
   .install .dollar { color: var(--faint); }
   .install button {
-    background: none; border: none; color: var(--muted); cursor: pointer;
-    font: 12px var(--mono); padding: 4px 6px;
+    background: none; border: none; color: var(--faint); cursor: pointer;
+    font: 500 12px var(--mono); padding: 4px 6px; transition: color .2s;
   }
   .install button:hover { color: var(--ink); }
-  .hero-cta { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-top: 26px; }
 
-  /* ---------- simulator ---------- */
+  /* ---------- nav ---------- */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 60;
+    transition: background .4s, border-color .4s, backdrop-filter .4s;
+    border-bottom: 1px solid transparent;
+  }
+  nav.scrolled {
+    background: rgba(13,11,10,.72);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border-bottom-color: var(--line);
+  }
+  nav .wrap { display: flex; align-items: center; gap: 30px; height: 66px; }
+  .logo { font: 650 17px var(--display); color: var(--ink); display: flex; gap: 9px; align-items: center; letter-spacing: -.01em; }
+  .logo b { color: var(--accent); }
+  nav .links { display: flex; gap: 26px; font-size: 13.5px; margin-left: auto; }
+  nav .links a { color: var(--muted); transition: color .2s; }
+  nav .links a:hover { color: var(--ink); text-decoration: none; }
+  nav .gh {
+    font: 600 13px var(--body); color: var(--ink);
+    border: 1px solid var(--line-2); border-radius: 8px; padding: 9px 15px;
+    transition: border-color .2s, background .2s;
+  }
+  nav .gh:hover { border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.04); text-decoration: none; }
+  @media (max-width: 760px) { nav .links { display: none; } }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 170px 0 96px; overflow: visible; }
+  .glow { position: absolute; border-radius: 50%; filter: blur(130px); pointer-events: none; z-index: 0; }
+  .glow.a { width: 620px; height: 620px; background: rgba(232,96,44,.14); top: -220px; left: 4%; animation: drift 19s ease-in-out infinite alternate; }
+  .glow.b { width: 520px; height: 520px; background: rgba(155,123,217,.09); top: -160px; right: 0; animation: drift 24s ease-in-out infinite alternate-reverse; }
+  @keyframes drift { from { transform: translate(0,0) } to { transform: translate(70px, 50px) } }
+
+  .hero .wrap { display: grid; gap: 52px; }
+  .hero-copy { max-width: 780px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 9px;
+    font: 500 12.5px var(--mono); color: var(--muted);
+    border: 1px solid var(--line); border-radius: 100px; padding: 7px 15px;
+    background: rgba(255,255,255,.02); margin-bottom: 30px;
+  }
+  .pill b { color: var(--accent-2); font-weight: 600; }
+  .pill:hover { text-decoration: none; border-color: var(--line-2); }
+  .grad {
+    background: linear-gradient(100deg, #ff9a60 0%, var(--accent) 45%, #ff9a60 90%);
+    background-size: 200% auto;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: shimmer 5s linear infinite;
+  }
+  @keyframes shimmer { to { background-position: 200% center } }
+  .hero-copy p.sub { color: var(--muted); font-size: 19px; max-width: 56ch; margin: 26px 0 0; }
+  .hero-cta { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-top: 38px; }
+
+  /* choreographed load-in */
+  @keyframes rise { from { opacity: 0; transform: translateY(24px) } to { opacity: 1; transform: none } }
+  [data-load] { opacity: 0; animation: rise .9s var(--ease) forwards; }
+  [data-load="1"] { animation-delay: .05s } [data-load="2"] { animation-delay: .18s }
+  [data-load="3"] { animation-delay: .32s } [data-load="4"] { animation-delay: .46s }
+  [data-load="5"] { animation-delay: .62s }
+
+  /* ---------- simulator (glass panel) ---------- */
   .sim {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-    padding: 18px; display: grid; gap: 14px;
+    position: relative; border-radius: 20px; padding: 22px;
+    background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+    border: 1px solid var(--line);
+    box-shadow: 0 30px 80px -30px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.05);
+    display: grid; gap: 16px;
+  }
+  .sim::before { /* gradient edge highlight */
+    content: ""; position: absolute; inset: -1px; border-radius: 21px; pointer-events: none;
+    background: linear-gradient(120deg, rgba(232,96,44,.35), transparent 30%, transparent 70%, rgba(155,123,217,.2));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; padding: 1px;
   }
   .sim-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-  .sim-title { font: 600 11px var(--mono); color: var(--faint); text-transform: uppercase; letter-spacing: .15em; }
+  .sim-title { font: 600 11px var(--mono); color: var(--faint); text-transform: uppercase; letter-spacing: .18em; }
   .sim-badge {
     display: none; font: 600 12px var(--mono); color: var(--ok);
-    background: rgba(85,168,104,.12); border-radius: 4px; padding: 5px 9px;
+    background: rgba(87,171,107,.12); border: 1px solid rgba(87,171,107,.25);
+    border-radius: 6px; padding: 5px 10px;
   }
-  .sim-badge.show { display: inline-block; }
+  .sim-badge.show { display: inline-block; animation: rise .5s var(--ease); }
   #kill {
     margin-left: auto; font: 600 14px var(--body); color: #fff;
-    background: var(--crit); border: none; border-radius: 6px;
-    padding: 11px 18px; cursor: pointer; min-width: 168px;
+    background: linear-gradient(180deg, #e0605a, #c2413c); border: none; border-radius: 9px;
+    padding: 12px 20px; cursor: pointer; min-width: 172px;
+    box-shadow: 0 0 0 1px rgba(217,82,74,.4), 0 8px 24px -10px rgba(217,82,74,.6);
+    transition: transform .3s var(--ease), filter .2s;
   }
-  #kill.restore { background: var(--ok); }
-  #kill:hover { filter: brightness(1.1); }
-  #simcanvas { width: 100%; height: 240px; display: block; border-radius: 8px; background: var(--bg2); }
-  .sim-stats { display: flex; gap: 26px; flex-wrap: wrap; }
-  .sim-stats div { font: 12.5px var(--body); color: var(--muted); }
-  .sim-stats b { font: 600 16px var(--mono); color: var(--ink); display: block; font-variant-numeric: tabular-nums; }
-  .sim-stats .live b { color: var(--ok); } .sim-stats .fb b { color: var(--accent); }
-  .sim-stats .saved b { color: var(--ink); }
-  #simlog { font: 12px/1.9 var(--mono); color: var(--muted); min-height: 70px; }
+  #kill:hover { transform: translateY(-1px); filter: brightness(1.08); }
+  #kill.restore { background: linear-gradient(180deg, #5cb370, #43955a); box-shadow: 0 0 0 1px rgba(87,171,107,.4), 0 8px 24px -10px rgba(87,171,107,.5); }
+  #simcanvas { width: 100%; height: 248px; display: block; border-radius: 12px; background: #0a0908; }
+  .sim-stats { display: flex; gap: 30px; flex-wrap: wrap; }
+  .sim-stats div { font: 12.5px var(--body); color: var(--faint); }
+  .sim-stats b { font: 600 17px var(--mono); color: var(--ink); display: block; font-variant-numeric: tabular-nums; }
+  .sim-stats .live b { color: var(--ok); } .sim-stats .fb b { color: var(--accent-2); }
+  #simlog { font: 12px/1.95 var(--mono); color: var(--muted); min-height: 72px; }
   #simlog .crit { color: var(--crit); } #simlog .ok { color: var(--ok); }
   #simlog .warn { color: var(--warn); } #simlog .chaos { color: var(--chaos); }
 
-  /* ---------- problem ---------- */
-  .grid3 { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 34px; }
-  .card {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-    padding: 22px;
+  /* ---------- marquee ---------- */
+  .marquee {
+    overflow: hidden; border-block: 1px solid var(--line); padding: 0; position: relative; z-index: 1;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+    background: rgba(255,255,255,.012);
   }
-  .card h3 { margin-bottom: 8px; }
-  .card p { color: var(--muted); font-size: 14.5px; margin: 0; }
-  .card .k { font: 600 11px var(--mono); color: var(--crit); text-transform: uppercase; letter-spacing: .12em; display: block; margin-bottom: 10px; }
+  .marquee-track {
+    display: flex; gap: 64px; width: max-content; padding: 20px 0;
+    animation: scroll 34s linear infinite;
+  }
+  .marquee span { font: 500 13px var(--mono); color: var(--faint); letter-spacing: .08em; white-space: nowrap; }
+  .marquee span b { color: var(--muted); font-weight: 500; }
+  @keyframes scroll { to { transform: translateX(-50%) } }
 
-  /* ---------- steps ---------- */
-  .step { display: grid; gap: 28px; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: center; margin-top: 44px; }
-  @media (max-width: 820px) { .step { grid-template-columns: 1fr; } }
-  .step h3 { font: 600 20px var(--mono); margin-bottom: 8px; }
-  .step h3 span { color: var(--accent); margin-right: 10px; }
-  .step p { color: var(--muted); font-size: 15px; }
-  pre.code {
-    margin: 0; background: var(--bg2); border: 1px solid var(--line); border-radius: 10px;
-    padding: 18px 20px; font-size: 13px; line-height: 1.65; overflow-x: auto;
+  /* ---------- stats band ---------- */
+  .stats-band { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+  .stat { border-left: 1px solid var(--line-2); padding: 6px 0 6px 24px; }
+  .stat b {
+    display: block; font: 650 clamp(34px, 4vw, 48px)/1.1 var(--display);
+    letter-spacing: -.03em; font-variant-numeric: tabular-nums;
+  }
+  .stat b em { font-style: normal; color: var(--accent-2); }
+  .stat span { color: var(--faint); font-size: 13.5px; }
+
+  /* ---------- spotlight cards ---------- */
+  .card {
+    position: relative; overflow: hidden; border-radius: 18px;
+    background: var(--panel); border: 1px solid var(--line);
+    padding: 28px; transition: transform .5s var(--ease), border-color .4s;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; opacity: 0;
+    background: radial-gradient(520px circle at var(--mx, 50%) var(--my, 50%), rgba(232,96,44,.09), transparent 45%);
+    transition: opacity .45s; pointer-events: none;
+  }
+  .card:hover { transform: translateY(-3px); border-color: var(--line-2); }
+  .card:hover::before { opacity: 1; }
+  .card h3 { margin-bottom: 10px; }
+  .card p { color: var(--muted); font-size: 14.5px; margin: 0; line-height: 1.7; }
+  .card .k {
+    font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .16em;
+    display: block; margin-bottom: 14px; color: var(--crit);
+  }
+  .grid3 { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 48px; }
+
+  /* ---------- bento ---------- */
+  .bento { display: grid; gap: 18px; grid-template-columns: repeat(12, 1fr); margin-top: 48px; }
+  .bento .card { display: flex; flex-direction: column; gap: 10px; }
+  .b7 { grid-column: span 7; } .b5 { grid-column: span 5; } .b4 { grid-column: span 4; }
+  @media (max-width: 900px) { .b7, .b5, .b4 { grid-column: span 12; } }
+  .card .icon { font-size: 20px; margin-bottom: 6px; }
+  .chip-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .state-chip {
+    font: 700 10.5px var(--mono); letter-spacing: .1em; border-radius: 6px; padding: 6px 10px;
+  }
+  .state-chip.closed { color: #a4dcb0; background: rgba(87,171,107,.14); }
+  .state-chip.open { color: #f0a9a4; background: rgba(217,82,74,.16); }
+  .state-chip.half { color: #ecca8e; background: rgba(217,160,54,.14); }
+  @keyframes cyclePulse { 0%, 100% { opacity: .35 } 12%, 30% { opacity: 1 } }
+  .cycle .state-chip { opacity: .35; animation: cyclePulse 6s infinite; }
+  .cycle .state-chip:nth-child(1) { animation-delay: 0s }
+  .cycle .state-chip:nth-child(2) { animation-delay: 2s }
+  .cycle .state-chip:nth-child(3) { animation-delay: 4s }
+  .rungs { display: grid; gap: 8px; margin-top: 16px; }
+  .rung {
+    font: 500 12.5px var(--mono); color: var(--muted);
+    border: 1px solid var(--line); border-radius: 8px; padding: 9px 13px;
+    opacity: .5; animation: cyclePulse 8s infinite;
+  }
+  .rung:nth-child(1) { animation-delay: 0s } .rung:nth-child(2) { animation-delay: 2s }
+  .rung:nth-child(3) { animation-delay: 4s } .rung:nth-child(4) { animation-delay: 6s }
+  .rung b { color: var(--accent-2); font-weight: 600; }
+
+  /* ---------- code / terminal windows ---------- */
+  .window {
+    background: #0b0a09; border: 1px solid var(--line); border-radius: 14px;
+    overflow: hidden; box-shadow: 0 24px 60px -28px rgba(0,0,0,.8);
+  }
+  .window .bar {
+    display: flex; align-items: center; gap: 7px; padding: 12px 16px;
+    border-bottom: 1px solid var(--line); background: rgba(255,255,255,.015);
+  }
+  .window .bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--line-2); }
+  .window .bar i:nth-child(1) { background: #e0605a } .window .bar i:nth-child(2) { background: #d9a036 }
+  .window .bar i:nth-child(3) { background: #57ab6b }
+  .window .bar span { margin-left: 10px; font: 500 11.5px var(--mono); color: var(--faint); }
+  .window pre {
+    margin: 0; padding: 20px 22px; font: 13px/1.7 var(--mono); overflow-x: auto;
   }
   .code .c { color: var(--faint); } .code .s { color: #c9a36b; }
-  .code .kw { color: var(--accent); } .code .fn { color: #8fb573; }
+  .code .kw { color: var(--accent-2); } .code .fn { color: #93bd78; }
   .code .crit { color: var(--crit); } .code .okc { color: var(--ok); }
-  .code .chaosc { color: var(--chaos); } .code .warnc { color: var(--warn); }
+  .code .warnc { color: var(--warn); }
 
-  /* ---------- features ---------- */
-  .feat { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 34px; }
-  .feat .card b { font-family: var(--mono); font-size: 14.5px; }
+  .step { display: grid; gap: 40px; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: center; margin-top: 64px; }
+  @media (max-width: 860px) { .step { grid-template-columns: 1fr; gap: 22px; } }
+  .step h3 { font: 650 24px var(--display); margin-bottom: 12px; letter-spacing: -.02em; }
+  .step h3 span { color: var(--accent); font-family: var(--mono); font-size: 15px; margin-right: 12px; vertical-align: 3px; }
+  .step p { color: var(--muted); font-size: 15.5px; line-height: 1.75; }
 
-  /* ---------- chaos ---------- */
-  .chaos-band { background: var(--bg2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-  .term {
-    background: #0f0d0c; border: 1px solid var(--line); border-radius: 10px;
-    padding: 18px 20px; font: 12.5px/1.8 var(--mono); margin-top: 30px; overflow-x: auto;
+  /* ---------- chaos band ---------- */
+  .chaos-band {
+    background: linear-gradient(180deg, rgba(155,123,217,.05), transparent 60%);
+    border-block: 1px solid var(--line);
   }
-  .term .row { opacity: 0; transform: translateY(4px); transition: opacity .4s, transform .4s; white-space: pre; }
-  .term .row.show { opacity: 1; transform: none; }
+  .chaos-band .eyebrow { color: var(--chaos); } .chaos-band .eyebrow::before { background: var(--chaos); }
+  .term-rows { padding: 20px 22px; font: 12.5px/1.9 var(--mono); overflow-x: auto; }
+  .term-rows .row { opacity: 0; transform: translateY(5px); transition: opacity .45s var(--ease), transform .45s var(--ease); white-space: pre; }
+  .term-rows .row.show { opacity: 1; transform: none; }
 
-  /* ---------- dashboard showcase ---------- */
-  .showcase {
-    display: block; width: 100%; margin-top: 30px;
-    border: 1px solid var(--line); border-radius: 12px; background: var(--bg2);
+  /* ---------- showcase video ---------- */
+  .showcase-frame {
+    position: relative; border-radius: 18px; padding: 10px; margin-top: 44px;
+    background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.01));
+    border: 1px solid var(--line);
+    box-shadow: 0 40px 100px -40px rgba(232,96,44,.25), 0 30px 80px -30px rgba(0,0,0,.8);
   }
-  @media (prefers-reduced-motion: reduce) {
-    .term .row { opacity: 1; transform: none; transition: none; }
-  }
+  .showcase { display: block; width: 100%; border-radius: 10px; background: #0a0908; }
 
   /* ---------- wizard ---------- */
-  .wizard { display: grid; gap: 24px; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); margin-top: 36px; align-items: start; }
-  @media (max-width: 900px) { .wizard { grid-template-columns: 1fr; } }
-  .wizard .q { margin-bottom: 22px; }
-  .wizard .q > span { display: block; font: 600 12px var(--mono); color: var(--faint); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 10px; }
-  .opts { display: flex; gap: 8px; flex-wrap: wrap; }
-  .opts label {
-    display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
-    font-size: 13.5px; color: var(--muted);
-    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 13px;
+  .wizard { display: grid; gap: 32px; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); margin-top: 52px; align-items: start; }
+  @media (max-width: 940px) { .wizard { grid-template-columns: 1fr; } }
+  .wizard .q { margin-bottom: 26px; }
+  .wizard .q > span {
+    display: block; font: 600 11px var(--mono); color: var(--faint);
+    text-transform: uppercase; letter-spacing: .16em; margin-bottom: 12px;
   }
-  .opts label:has(:checked) { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); }
+  .opts { display: flex; gap: 9px; flex-wrap: wrap; }
+  .opts label {
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+    font: 500 13.5px var(--body); color: var(--muted);
+    background: rgba(255,255,255,.02); border: 1px solid var(--line); border-radius: 9px;
+    padding: 9px 15px; transition: border-color .25s, color .25s, background .25s, transform .3s var(--ease);
+  }
+  .opts label:hover { transform: translateY(-1px); border-color: var(--line-2); }
+  .opts label:has(:checked) {
+    border-color: rgba(232,96,44,.55); color: var(--ink);
+    background: rgba(232,96,44,.08); box-shadow: 0 0 20px -8px rgba(232,96,44,.4);
+  }
   .opts input { accent-color: var(--accent); margin: 0; }
   .opts input[type="number"] {
-    width: 90px; background: var(--bg2); border: 1px solid var(--line); border-radius: 4px;
-    color: var(--ink); font: 13px var(--mono); padding: 6px 8px;
+    width: 90px; background: #0b0a09; border: 1px solid var(--line); border-radius: 6px;
+    color: var(--ink); font: 13px var(--mono); padding: 7px 9px;
   }
   .genwrap { position: relative; }
   #gencopy {
-    position: absolute; top: 12px; right: 12px;
-    font: 600 11.5px var(--mono); color: var(--muted); background: var(--panel);
-    border: 1px solid var(--line); border-radius: 5px; padding: 6px 10px; cursor: pointer;
+    position: absolute; top: 11px; right: 14px; z-index: 2;
+    font: 600 11.5px var(--mono); color: var(--muted); background: rgba(255,255,255,.04);
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer;
+    transition: color .2s, border-color .2s;
   }
-  #gencopy:hover { color: var(--ink); }
+  #gencopy:hover { color: var(--ink); border-color: var(--line-2); }
   #gen { min-height: 460px; }
 
   /* ---------- faq ---------- */
-  details {
-    border-bottom: 1px solid var(--line); padding: 18px 4px;
+  details { border-bottom: 1px solid var(--line); padding: 22px 4px; }
+  details summary {
+    cursor: pointer; font: 600 16px var(--body); list-style: none;
+    display: flex; align-items: center; transition: color .2s;
   }
-  details summary { cursor: pointer; font: 600 15.5px var(--body); list-style: none; display: flex; }
-  details summary::after { content: "+"; margin-left: auto; color: var(--accent); font: 400 20px var(--mono); }
-  details[open] summary::after { content: "–"; }
-  details p { color: var(--muted); font-size: 14.5px; max-width: 70ch; }
+  details summary:hover { color: var(--accent-2); }
+  details summary::after {
+    content: "+"; margin-left: auto; color: var(--accent);
+    font: 300 22px var(--mono); transition: transform .4s var(--ease);
+  }
+  details[open] summary::after { transform: rotate(45deg); }
+  details p { color: var(--muted); font-size: 15px; max-width: 72ch; line-height: 1.75; }
 
   /* ---------- cta / footer ---------- */
-  .cta-band { text-align: center; background: var(--bg2); border-top: 1px solid var(--line); }
-  .cta-band .install { margin-top: 26px; }
-  footer { border-top: 1px solid var(--line); padding: 34px 0 44px; color: var(--faint); font-size: 13px; }
-  footer .wrap { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
+  .cta-band { text-align: center; border-top: 1px solid var(--line); position: relative; overflow: hidden; }
+  .cta-band .glow.c {
+    width: 700px; height: 340px; background: rgba(232,96,44,.10);
+    left: 50%; bottom: -220px; transform: translateX(-50%); filter: blur(110px);
+  }
+  .cta-band .install { margin-top: 34px; }
+  footer { border-top: 1px solid var(--line); padding: 44px 0 60px; color: var(--faint); font-size: 13.5px; position: relative; overflow: hidden; }
+  footer .wrap { display: flex; gap: 26px; flex-wrap: wrap; align-items: center; }
   footer a { color: var(--muted); }
+  footer .ghost {
+    position: absolute; left: 50%; bottom: -70px; transform: translateX(-50%);
+    font: 700 200px var(--display); letter-spacing: -.04em; color: rgba(255,255,255,.018);
+    pointer-events: none; user-select: none; white-space: nowrap;
+  }
+
+  /* ---------- reduced motion ---------- */
+  @media (prefers-reduced-motion: reduce) {
+    [data-load], [data-reveal] { opacity: 1 !important; transform: none !important; animation: none !important; transition: none !important; }
+    .glow, .grad, .marquee-track, .cycle .state-chip, .rung { animation: none !important; }
+    .cycle .state-chip, .rung { opacity: 1; }
+    html { scroll-behavior: auto; }
+    .term-rows .row { opacity: 1; transform: none; transition: none; }
+  }
 </style>
 </head>
 <body>
 
-<nav>
+<nav id="nav">
   <div class="wrap">
     <a class="logo" href="#"><b>◆</b> Ballast</a>
     <div class="links">
@@ -214,7 +407,7 @@
       <a href="#features">Features</a>
       <a href="#chaos">Chaos testing</a>
       <a href="#start">Get started</a>
-      <a href="https://github.com/s3ak6i-dev/Ballast#readme">Docs</a>
+      <a href="https://pypi.org/project/ballast-agents/">PyPI</a>
     </div>
     <a class="gh" href="https://github.com/s3ak6i-dev/Ballast">GitHub ↗</a>
   </div>
@@ -222,31 +415,32 @@
 
 <!-- ================= HERO ================= -->
 <header class="hero">
+  <div class="glow a"></div><div class="glow b"></div>
   <div class="wrap">
     <div class="hero-copy">
-      <div class="eyebrow">Resilience for multi-agent AI systems</div>
-      <h1>Your agent swarm<br>will survive this.</h1>
-      <p>Ballast adds circuit breakers, backpressure, and cost-aware fallbacks to any
+      <a class="pill" data-load="1" href="https://pypi.org/project/ballast-agents/"><b>◆ v0.1.0</b> now on PyPI — pip install ballast-agents</a>
+      <h1 data-load="2">Your agent swarm<br>will <span class="grad">survive</span> this.</h1>
+      <p class="sub" data-load="3">Ballast adds circuit breakers, backpressure, and cost-aware fallbacks to any
          AI agent pipeline — and chaos testing to prove they work. One Python decorator.
          No orchestrator rewrite.</p>
-      <div class="hero-cta">
+      <div class="hero-cta" data-load="4">
         <span class="install"><span class="dollar">$</span> pip install ballast-agents
           <button data-copy="pip install ballast-agents" aria-label="Copy install command">copy</button></span>
-        <a class="btn ghost" href="https://github.com/s3ak6i-dev/Ballast">Star on GitHub</a>
+        <a class="btn ghost" href="https://github.com/s3ak6i-dev/Ballast">Star on GitHub <span class="arrow">→</span></a>
       </div>
     </div>
 
-    <div class="sim" aria-label="Interactive circuit breaker demo">
+    <div class="sim" data-load="5" aria-label="Interactive circuit breaker demo">
       <div class="sim-top">
         <span class="sim-title">Live simulation — 40 agents · 1 flaky API</span>
         <span class="sim-badge" id="detect"></span>
         <button id="kill">💥 Kill the API</button>
       </div>
-      <canvas id="simcanvas" height="240"></canvas>
+      <canvas id="simcanvas" height="248"></canvas>
       <div class="sim-stats">
         <div class="live"><b id="st-live">0</b>served live</div>
         <div class="fb"><b id="st-fb">0</b>served by fallback</div>
-        <div class="saved"><b id="st-fail" style="color:var(--crit)">0</b>hard failures</div>
+        <div><b id="st-fail" style="color:var(--crit)">0</b>hard failures</div>
         <div><b id="st-state" style="color:var(--ok)">CLOSED</b>breaker state</div>
       </div>
       <div id="simlog" aria-live="polite"></div>
@@ -254,23 +448,44 @@
   </div>
 </header>
 
-<!-- ================= PROBLEM ================= -->
-<section>
+<!-- ================= MARQUEE ================= -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track" id="mtrack">
+    <span>WORKS WITH <b>LANGGRAPH</b></span><span><b>CREWAI</b></span><span><b>AUTOGEN</b></span>
+    <span><b>OPENAI SDK</b></span><span><b>ANTHROPIC SDK</b></span><span><b>CUSTOM AGENT LOOPS</b></span>
+    <span>SYNC <b>+ ASYNC</b></span><span><b>ZERO</b> RUNTIME DEPS</span><span><b>MIT</b> LICENSED</span>
+  </div>
+</div>
+
+<!-- ================= STATS ================= -->
+<section style="padding: 90px 0 70px">
   <div class="wrap">
-    <div class="eyebrow">The problem</div>
-    <h2>One slow API can take down your whole swarm.</h2>
-    <p class="lede">Multi-agent systems ship with almost none of the hardening microservices
+    <div class="stats-band">
+      <div class="stat" data-reveal style="--i:0"><b><em data-count="56">0</em>ms</b><span>median failure detection in the recorded demo</span></div>
+      <div class="stat" data-reveal style="--i:1"><b><em data-count="96">0</em></b><span>deterministic tests, CI-green on Linux &amp; Windows</span></div>
+      <div class="stat" data-reveal style="--i:2"><b><em data-count="5901">0</em></b><span>fallbacks served during one 4-second outage</span></div>
+      <div class="stat" data-reveal style="--i:3"><b><em data-count="0">0</em></b><span>API keys needed to watch it survive an incident</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PROBLEM ================= -->
+<section style="padding-top: 40px">
+  <div class="wrap">
+    <div class="eyebrow" data-reveal>The problem</div>
+    <h2 data-reveal style="--i:1">One slow API can take down<br>your whole swarm.</h2>
+    <p class="lede" data-reveal style="--i:2">Multi-agent systems ship with almost none of the hardening microservices
        learned over 15 years. The failure modes are old; the ecosystem is new.</p>
     <div class="grid3">
-      <div class="card"><span class="k">Cascading failure</span>
+      <div class="card" data-reveal style="--i:0"><span class="k">Cascading failure</span>
         <h3>Retries pile up until everything dies</h3>
         <p>One degraded tool makes every agent retry. Retries exhaust connections,
            budgets, and patience — then the whole pipeline fails, not just the sick dependency.</p></div>
-      <div class="card"><span class="k">No backpressure</span>
+      <div class="card" data-reveal style="--i:1"><span class="k">No backpressure</span>
         <h3>Fan-outs hammer your dependencies</h3>
         <p>A task spawns 50 agents; 50 agents hit one API at once. Nothing queues,
            nothing sheds, nothing throttles — until the API does it for you, with 429s and bans.</p></div>
-      <div class="card"><span class="k">Uncontrolled cost</span>
+      <div class="card" data-reveal style="--i:2"><span class="k">Uncontrolled cost</span>
         <h3>Swarms burn budgets in minutes</h3>
         <p>Every retry is a token bill. Without cost-aware routing, an incident isn't
            just downtime — it's the most expensive hour of your month.</p></div>
@@ -279,45 +494,48 @@
 </section>
 
 <!-- ================= HOW ================= -->
-<section id="how" style="padding-top: 24px">
+<section id="how" style="padding-top: 40px">
   <div class="wrap">
-    <div class="eyebrow">How it works</div>
-    <h2>Wrap. Detect. Degrade.</h2>
+    <div class="eyebrow" data-reveal>How it works</div>
+    <h2 data-reveal style="--i:1">Wrap. Detect. Degrade.</h2>
 
-    <div class="step">
+    <div class="step" data-reveal>
       <div>
         <h3><span>01</span>Wrap</h3>
         <p>Decorate any call — a tool, an LLM API, a database query. That's the entire
-           integration. Works with LangGraph, CrewAI, AutoGen, or a plain agent loop.</p>
+           integration. Sync or <code>async def</code>, auto-detected. Works with LangGraph,
+           CrewAI, AutoGen, or a plain agent loop.</p>
       </div>
+      <div class="window"><div class="bar"><i></i><i></i><i></i><span>your_agent.py</span></div>
       <pre class="code"><span class="kw">from</span> ballast <span class="kw">import</span> guarded
 
 <span class="kw">@guarded</span>(dependency=<span class="s">"openai_api"</span>, timeout=<span class="warnc">10</span>)
-<span class="kw">def</span> <span class="fn">call_llm</span>(prompt: str) -> str:
-    <span class="kw">return</span> client.chat.completions.create(...)</pre>
+<span class="kw">async def</span> <span class="fn">call_llm</span>(prompt: str) -> str:
+    <span class="kw">return await</span> client.chat.completions.create(...)</pre></div>
     </div>
 
-    <div class="step">
+    <div class="step" data-reveal>
       <div>
         <h3><span>02</span>Detect</h3>
         <p>Every dependency gets a circuit breaker: a rolling window of failures and
            latency versus a learned healthy baseline. When an API degrades, the breaker
            trips in milliseconds — and stops your swarm from hammering a dying service.</p>
       </div>
-      <pre class="code"><span class="c"># the event stream, live:</span>
-<span class="crit">breaker_trip</span>      openai_api  <span class="c">failure_rate=0.55, cooldown=10s</span>
+      <div class="window"><div class="bar"><i></i><i></i><i></i><span>event stream</span></div>
+      <pre class="code"><span class="crit">breaker_trip</span>      openai_api  <span class="c">failure_rate=0.55, cooldown=10s</span>
 <span class="warnc">breaker_half_open</span> openai_api  <span class="c">probing recovery…</span>
-<span class="okc">breaker_close</span>     openai_api  <span class="c">probes_succeeded</span></pre>
+<span class="okc">breaker_close</span>     openai_api  <span class="c">probes_succeeded</span></pre></div>
     </div>
 
-    <div class="step">
+    <div class="step" data-reveal>
       <div>
         <h3><span>03</span>Degrade</h3>
         <p>While the breaker is open, calls don't fail — they walk a fallback chain:
-           a cached answer, a cheaper model (when a rules-based classifier says it's safe),
+           a cached answer, a cheaper model when a classifier says it's safe,
            or a static response. Your pipeline keeps moving, and it costs <em>less</em>
            during the incident, not more.</p>
       </div>
+      <div class="window"><div class="bar"><i></i><i></i><i></i><span>your_agent.py</span></div>
       <pre class="code"><span class="kw">@guarded</span>(
     dependency=<span class="s">"openai_api"</span>,
     cache_ttl_s=<span class="warnc">300</span>,          <span class="c"># rung 1: recent identical answer</span>
@@ -325,35 +543,51 @@
     fallback=<span class="s">"degraded"</span>,      <span class="c"># rung 3: static last resort</span>
     cost_fn=<span class="kw">lambda</span> r: r.cost, <span class="c"># meter spend vs. your budget</span>
 )
-<span class="kw">def</span> <span class="fn">call_llm</span>(prompt: str) -> str: ...</pre>
+<span class="kw">def</span> <span class="fn">call_llm</span>(prompt: str) -> str: ...</pre></div>
     </div>
   </div>
 </section>
 
-<!-- ================= FEATURES ================= -->
-<section id="features" style="padding-top: 24px">
+<!-- ================= FEATURES (bento) ================= -->
+<section id="features" style="padding-top: 40px">
   <div class="wrap">
-    <div class="eyebrow">What's in the box</div>
-    <h2>Distributed-systems hardening, agent-shaped.</h2>
-    <div class="feat">
-      <div class="card"><b>⚡ Per-dependency circuit breakers</b>
-        <p>Trip on failure rate or p95 latency vs. a learned baseline. Half-open probing,
-           exponential-backoff cooldowns, manual overrides.</p></div>
-      <div class="card"><b>🚦 Global backpressure</b>
-        <p>A concurrency ceiling with strict-FIFO queueing. Excess load queues, then sheds —
-           your system degrades instead of collapsing.</p></div>
-      <div class="card"><b>🪜 Fallback chain</b>
-        <p>Cache → cheaper model → static value → explicit error. Configured per dependency,
-           served automatically when the breaker opens.</p></div>
-      <div class="card"><b>🧮 Cost-aware routing</b>
-        <p>Rolling-hour budgets with soft and hard ceilings. Past the soft ceiling, simple
-           requests route to a cheaper model automatically.</p></div>
-      <div class="card"><b>💥 Chaos injection</b>
-        <p>Time-boxed failure, latency, and corruption rules against your real code path.
-           Your resilience demos double as CI tests.</p></div>
-      <div class="card"><b>📊 Live dashboard</b>
-        <p>Breaker states, traffic and cost charts, a coalescing event feed, and a one-click
-           built-in incident demo — over WebSocket, on localhost.</p></div>
+    <div class="eyebrow" data-reveal>What's in the box</div>
+    <h2 data-reveal style="--i:1">Distributed-systems hardening,<br>agent-shaped.</h2>
+    <div class="bento">
+      <div class="card b7" data-reveal style="--i:0"><span class="icon">⚡</span>
+        <h3>Per-dependency circuit breakers</h3>
+        <p>Trip on failure rate or p95 latency vs. a learned healthy baseline — one that
+           excludes anomalies, so a degrading dependency can't drag its own baseline up
+           and mask the degradation. Half-open probing, exponential-backoff cooldowns,
+           manual overrides.</p>
+        <div class="chip-row cycle" aria-hidden="true">
+          <span class="state-chip closed">CLOSED</span>
+          <span class="state-chip open">OPEN</span>
+          <span class="state-chip half">HALF-OPEN</span>
+        </div></div>
+      <div class="card b5" data-reveal style="--i:1"><span class="icon">🚦</span>
+        <h3>Global backpressure</h3>
+        <p>A concurrency ceiling with strict-FIFO queueing — no barging, sync and async
+           in the same queue. Excess load queues, then sheds. Your system degrades
+           instead of collapsing.</p></div>
+      <div class="card b4" data-reveal style="--i:0"><span class="icon">🪜</span>
+        <h3>Fallback chain</h3>
+        <p>Tried in order, automatically, when a call can't reach its dependency:</p>
+        <div class="rungs" aria-hidden="true">
+          <div class="rung"><b>1</b> cached response</div>
+          <div class="rung"><b>2</b> cheaper model</div>
+          <div class="rung"><b>3</b> static value</div>
+          <div class="rung"><b>4</b> explicit error</div>
+        </div></div>
+      <div class="card b4" data-reveal style="--i:1"><span class="icon">🧮</span>
+        <h3>Cost-aware routing</h3>
+        <p>Rolling-hour budgets with soft and hard ceilings. Past the soft ceiling,
+           simple requests route to a cheaper model automatically — a rules-based,
+           explainable classifier decides, and it's pluggable.</p></div>
+      <div class="card b4" data-reveal style="--i:2"><span class="icon">🗃️</span>
+        <h3>Full audit trail</h3>
+        <p>Every trip, reroute, shed, budget crossing, and chaos event flows through one
+           bus into SQLite — queryable, exportable, and streamed live to the dashboard.</p></div>
     </div>
   </div>
 </section>
@@ -361,21 +595,24 @@
 <!-- ================= CHAOS ================= -->
 <section id="chaos" class="chaos-band">
   <div class="wrap">
-    <div class="eyebrow" style="color: var(--chaos)">Chaos testing</div>
-    <h2>Don't claim resilience. Prove it.</h2>
-    <p class="lede">Everyone says their pipeline survives an outage. Ballast lets you kill a
+    <div class="eyebrow" data-reveal>Chaos testing</div>
+    <h2 data-reveal style="--i:1">Don't claim resilience.<br>Prove it.</h2>
+    <p class="lede" data-reveal style="--i:2">Everyone says their pipeline survives an outage. Ballast lets you kill a
        dependency on purpose — in dev, time-boxed, against the real code path — and watch the
        system detect, reroute, and recover. This is the actual output:</p>
-    <div class="term" id="term">
-      <div class="row">$ python examples/demo.py</div>
-      <div class="row" style="color:var(--chaos)">[  3.03s] &gt;&gt; CHAOS INJECTED   mock_api  {failure, 85%, 4s}</div>
-      <div class="row" style="color:var(--crit)">[  3.06s] !! BREAKER TRIP     mock_api  {failure_rate: 0.55}   ← detected in 0.02s</div>
-      <div class="row" style="color:var(--accent)">[  3.06s] -&gt; FALLBACK ACTIVE  mock_api  (serving cached responses)</div>
-      <div class="row" style="color:var(--warn)">[  5.06s] ?? HALF-OPEN        mock_api  probe failed → cooldown doubled</div>
-      <div class="row" style="color:var(--chaos)">[  9.06s] &lt;&lt; CHAOS CLEARED    mock_api  {expired}</div>
-      <div class="row" style="color:var(--ok)">[  9.11s] OK BREAKER CLOSE    mock_api  {probes_succeeded}</div>
-      <div class="row">&nbsp;</div>
-      <div class="row">calls: 10,466  |  live: 4,553  |  fallback: 5,901  |  errors: 12</div>
+    <div class="window" data-reveal style="margin-top: 44px">
+      <div class="bar"><i></i><i></i><i></i><span>python examples/demo.py</span></div>
+      <div class="term-rows" id="term">
+        <div class="row">$ python examples/demo.py</div>
+        <div class="row" style="color:var(--chaos)">[  3.03s] &gt;&gt; CHAOS INJECTED   mock_api  {failure, 85%, 4s}</div>
+        <div class="row" style="color:var(--crit)">[  3.06s] !! BREAKER TRIP     mock_api  {failure_rate: 0.55}   ← detected in 0.02s</div>
+        <div class="row" style="color:var(--accent-2)">[  3.06s] -&gt; FALLBACK ACTIVE  mock_api  (serving cached responses)</div>
+        <div class="row" style="color:var(--warn)">[  5.06s] ?? HALF-OPEN        mock_api  probe failed → cooldown doubled</div>
+        <div class="row" style="color:var(--chaos)">[  9.06s] &lt;&lt; CHAOS CLEARED    mock_api  {expired}</div>
+        <div class="row" style="color:var(--ok)">[  9.11s] OK BREAKER CLOSE    mock_api  {probes_succeeded}</div>
+        <div class="row">&nbsp;</div>
+        <div class="row">calls: 10,466  |  live: 4,553  |  fallback: 5,901  |  errors: 12</div>
+      </div>
     </div>
   </div>
 </section>
@@ -383,30 +620,32 @@
 <!-- ================= DASHBOARD ================= -->
 <section id="dashboard">
   <div class="wrap">
-    <div class="eyebrow">The dashboard</div>
-    <h2>Watch your swarm survive, live.</h2>
-    <p class="lede">Breaker cards with cooldown countdowns, traffic and cost-vs-budget charts,
+    <div class="eyebrow" data-reveal>The dashboard</div>
+    <h2 data-reveal style="--i:1">Watch your swarm survive, live.</h2>
+    <p class="lede" data-reveal style="--i:2">Breaker cards with cooldown countdowns, traffic and cost-vs-budget charts,
        and a coalescing event feed — streamed over WebSocket. This is a real recorded incident
        from the built-in demo (chaos at 0:08, recovery at 0:17):</p>
-    <video class="showcase" muted loop playsinline controls preload="metadata"
-           src="assets/dashboard-demo.mp4"
-           aria-label="Screen recording of the Ballast dashboard detecting and recovering from an injected failure"></video>
-    <p style="color: var(--faint); font-size: 13.5px; margin-top: 14px">
-      <code>docker compose up</code> → <a href="http://localhost:8080">localhost:8080</a>,
+    <div class="showcase-frame" data-reveal>
+      <video class="showcase" muted loop playsinline controls preload="metadata"
+             src="assets/dashboard-demo.mp4"
+             aria-label="Screen recording of the Ballast dashboard detecting and recovering from an injected failure"></video>
+    </div>
+    <p style="color: var(--faint); font-size: 13.5px; margin-top: 18px" data-reveal>
+      <code>docker compose up</code> → localhost:8080,
       or <code>python -m ballast.dashboard</code>. The demo needs no API keys.</p>
   </div>
 </section>
 
 <!-- ================= WIZARD ================= -->
-<section id="start">
+<section id="start" style="padding-top: 40px">
   <div class="wrap">
-    <div class="eyebrow">Get started</div>
-    <h2>Your config, in 60 seconds.</h2>
-    <p class="lede">Answer five questions; copy the result into your project. That's the
+    <div class="eyebrow" data-reveal>Get started</div>
+    <h2 data-reveal style="--i:1">Your config, in 60 seconds.</h2>
+    <p class="lede" data-reveal style="--i:2">Answer five questions; copy the result into your project. That's the
        whole integration.</p>
 
     <div class="wizard">
-      <div>
+      <div data-reveal>
         <div class="q"><span>1 · What are you protecting?</span>
           <div class="opts">
             <label><input type="checkbox" id="w-llm" checked> LLM API</label>
@@ -443,20 +682,21 @@
           </div>
         </div>
       </div>
-      <div class="genwrap">
-        <button id="gencopy" data-copy-target="gen">copy</button>
-        <pre class="code" id="gen"></pre>
+      <div class="genwrap" data-reveal style="--i:1">
+        <button id="gencopy">copy</button>
+        <div class="window"><div class="bar"><i></i><i></i><i></i><span>ballast_setup.py</span></div>
+        <pre class="code" id="gen"></pre></div>
       </div>
     </div>
   </div>
 </section>
 
 <!-- ================= FAQ ================= -->
-<section style="padding-top: 24px">
-  <div class="wrap" style="max-width: 820px">
-    <div class="eyebrow">Questions</div>
-    <h2>The honest FAQ.</h2>
-    <div style="margin-top: 26px">
+<section style="padding-top: 40px">
+  <div class="wrap" style="max-width: 860px">
+    <div class="eyebrow" data-reveal>Questions</div>
+    <h2 data-reveal style="--i:1">The honest FAQ.</h2>
+    <div style="margin-top: 34px" data-reveal>
       <details>
         <summary>How is this different from an LLM gateway (LiteLLM, Portkey, …)?</summary>
         <p>Gateways proxy your LLM traffic and can retry or reroute <em>API requests</em>.
@@ -491,23 +731,28 @@
 
 <!-- ================= CTA ================= -->
 <section class="cta-band">
+  <div class="glow c"></div>
   <div class="wrap">
-    <h2>Give your swarm some ballast.</h2>
-    <p class="lede" style="margin: 14px auto 0">Clone it, run the built-in incident demo,
+    <h2 data-reveal>Give your swarm some ballast.</h2>
+    <p class="lede" data-reveal style="--i:1; margin: 16px auto 0">Install it, run the built-in incident demo,
        and watch a breaker trip and recover in your browser — no API keys required.</p>
-    <span class="install"><span class="dollar">$</span> pip install "ballast-agents[dashboard]" &amp;&amp; python -m ballast.dashboard
-      <button data-copy='pip install "ballast-agents[dashboard]" && python -m ballast.dashboard' aria-label="Copy dashboard command">copy</button></span>
-    <div class="hero-cta" style="justify-content: center">
-      <a class="btn" href="https://github.com/s3ak6i-dev/Ballast">View on GitHub</a>
+    <div data-reveal style="--i:2">
+      <span class="install"><span class="dollar">$</span> pip install "ballast-agents[dashboard]" &amp;&amp; python -m ballast.dashboard
+        <button data-copy='pip install "ballast-agents[dashboard]" && python -m ballast.dashboard' aria-label="Copy dashboard command">copy</button></span>
+    </div>
+    <div class="hero-cta" style="justify-content: center" data-reveal>
+      <a class="btn" href="https://github.com/s3ak6i-dev/Ballast">View on GitHub <span class="arrow">→</span></a>
       <a class="btn ghost" href="https://github.com/s3ak6i-dev/Ballast#readme">Read the docs</a>
     </div>
   </div>
 </section>
 
 <footer>
+  <div class="ghost" aria-hidden="true">BALLAST</div>
   <div class="wrap">
     <span><b style="color:var(--accent)">◆</b> Ballast — MIT licensed</span>
     <a href="https://github.com/s3ak6i-dev/Ballast">GitHub</a>
+    <a href="https://pypi.org/project/ballast-agents/">PyPI</a>
     <a href="https://github.com/s3ak6i-dev/Ballast/blob/main/TechSpec.md">Tech spec</a>
     <a href="https://github.com/s3ak6i-dev/Ballast/blob/main/PRD.md">PRD</a>
     <span style="margin-left:auto">Designed docs-first: PRD → TechSpec → UISpec → code.</span>
@@ -525,6 +770,63 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
   });
 });
 
+/* ============ nav: blur on scroll ============ */
+(() => {
+  const nav = document.getElementById("nav");
+  const onScroll = () => nav.classList.toggle("scrolled", scrollY > 10);
+  addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+})();
+
+/* ============ reveal on scroll ============ */
+(() => {
+  const io = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) { entry.target.classList.add("in"); io.unobserve(entry.target); }
+    }
+  }, { threshold: 0.15, rootMargin: "0px 0px -6% 0px" });
+  document.querySelectorAll("[data-reveal]").forEach((el) => io.observe(el));
+})();
+
+/* ============ spotlight cards ============ */
+(() => {
+  if (matchMedia("(hover: none)").matches) return;
+  document.querySelectorAll(".card").forEach((card) => {
+    card.addEventListener("mousemove", (e) => {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty("--mx", (e.clientX - rect.left) + "px");
+      card.style.setProperty("--my", (e.clientY - rect.top) + "px");
+    });
+  });
+})();
+
+/* ============ animated counters ============ */
+(() => {
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const io = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      io.unobserve(entry.target);
+      const el = entry.target, target = +el.dataset.count;
+      if (reduced || target === 0) { el.textContent = target.toLocaleString(); continue; }
+      const t0 = performance.now(), dur = 1400;
+      (function tick(now) {
+        const p = Math.min(1, (now - t0) / dur);
+        const eased = 1 - Math.pow(1 - p, 4);
+        el.textContent = Math.round(target * eased).toLocaleString();
+        if (p < 1) requestAnimationFrame(tick);
+      })(t0);
+    }
+  }, { threshold: 0.6 });
+  document.querySelectorAll("[data-count]").forEach((el) => io.observe(el));
+})();
+
+/* ============ marquee: duplicate track for seamless loop ============ */
+(() => {
+  const track = document.getElementById("mtrack");
+  track.innerHTML += track.innerHTML;
+})();
+
 /* ============ hero simulator ============ */
 (() => {
   const canvas = document.getElementById("simcanvas");
@@ -532,8 +834,8 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const C = {
-    ink: "#ede7df", muted: "#9c9187", faint: "#6f665e", line: "#2d2823",
-    accent: "#e8602c", ok: "#55a868", warn: "#d9a036", crit: "#d9524a",
+    ink: "#f2ece4", muted: "#a59c92", faint: "#6f675f", line: "rgba(255,255,255,.09)",
+    accent: "#e8602c", ok: "#57ab6b", warn: "#d9a036", crit: "#d9524a",
   };
 
   /* --- a real (simplified) breaker: same semantics as the Python one --- */
@@ -593,7 +895,6 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
     fb:  { x: W * 0.86, y: H * 0.76, w: 108 },
   });
   function curve(a, b) {
-    // horizontal S-curve between node edges, like a node-graph editor
     const p0 = { x: a.x + a.w / 2 + 6, y: a.y };
     const p1 = { x: b.x - b.w / 2 - 6, y: b.y };
     const dx = p1.x - p0.x;
@@ -603,7 +904,7 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
     const n = N();
     return { toBrk: curve(n.src, n.brk), toApi: curve(n.brk, n.api), toFb: curve(n.brk, n.fb) };
   };
-  const DUR = { toBrk: 1.15, toApi: 0.85, toFb: 0.85 }; // seconds per leg
+  const DUR = { toBrk: 1.15, toApi: 0.85, toFb: 0.85 };
   function bez(c, t) {
     const u = 1 - t;
     return {
@@ -611,11 +912,11 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
       y: u * u * u * c.p0.y + 3 * u * u * t * c.c1.y + 3 * u * t * t * c.c2.y + t * t * t * c.p1.y,
     };
   }
-  const ease = (t) => t * t * (3 - 2 * t); // smoothstep: gentle accel/decel
+  const ease = (t) => t * t * (3 - 2 * t);
 
   let dots = [], apiUp = true, killedAt = 0, restoreTimer = null;
   const stats = { live: 0, fb: 0, failed: 0 };
-  const LANES = [-9, -4.5, 0, 4.5, 9]; // tidy parallel stream, not scatter
+  const LANES = [-9, -4.5, 0, 4.5, 9];
   let laneIdx = 0, spawnAcc = 0, lastFrame = 0;
 
   const logEl = document.getElementById("simlog");
@@ -674,15 +975,15 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
   }
 
   function node(n, label, sub, color) {
-    ctx.fillStyle = "#1c1917"; ctx.strokeStyle = C.line; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect(n.x - n.w / 2, n.y - NODE_H / 2, n.w, NODE_H, 9);
+    ctx.fillStyle = "#14110f"; ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(n.x - n.w / 2, n.y - NODE_H / 2, n.w, NODE_H, 10);
     ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.arc(n.x - n.w / 2 + 14, n.y, 3.5, 0, Math.PI * 2);
     ctx.fillStyle = color; ctx.fill();
     ctx.textAlign = "left";
-    ctx.fillStyle = C.ink; ctx.font = "600 11px ui-monospace, monospace";
+    ctx.fillStyle = C.ink; ctx.font = "600 11px 'JetBrains Mono', monospace";
     ctx.fillText(label, n.x - n.w / 2 + 24, n.y - 3);
-    ctx.fillStyle = C.faint; ctx.font = "10px ui-monospace, monospace";
+    ctx.fillStyle = C.faint; ctx.font = "10px 'JetBrains Mono', monospace";
     ctx.fillText(sub, n.x - n.w / 2 + 24, n.y + 11);
   }
 
@@ -698,9 +999,9 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
     const n = N(), paths = PATHS();
     const open = breaker.state === "open";
 
-    strokeCurve(paths.toBrk, "rgba(237,231,223,.07)");
-    strokeCurve(paths.toApi, open ? "rgba(217,82,74,.18)" : "rgba(237,231,223,.07)");
-    strokeCurve(paths.toFb, open ? "rgba(232,96,44,.45)" : "rgba(237,231,223,.05)", !open);
+    strokeCurve(paths.toBrk, "rgba(242,236,228,.07)");
+    strokeCurve(paths.toApi, open ? "rgba(217,82,74,.18)" : "rgba(242,236,228,.07)");
+    strokeCurve(paths.toFb, open ? "rgba(232,96,44,.45)" : "rgba(242,236,228,.05)", !open);
 
     spawnAcc += dt;
     const interval = reduced ? 0.5 : 0.15;
@@ -720,14 +1021,12 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
     }
     ctx.globalAlpha = 1;
 
-    // nodes painted over the dots so arrivals tuck neatly under the cards
     const stateColor = breaker.state === "closed" ? C.ok : open ? C.crit : C.warn;
     node(n.src, "AGENTS", "40 workers", C.ink);
     node(n.brk, "BREAKER", breaker.state.replace("_", "-").toUpperCase(), stateColor);
     node(n.api, "LLM API", apiUp ? "healthy" : "DOWN", apiUp ? C.ok : C.crit);
     node(n.fb, "FALLBACK", "cache · cheap", C.accent);
 
-    // live failure-rate meter under the breaker card
     const rate = breaker.window.length
       ? breaker.window.filter((x) => !x).length / breaker.window.length : 0;
     const mw = 76, mx = n.brk.x - mw / 2, my = n.brk.y + NODE_H / 2 + 8;
@@ -737,7 +1036,6 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
       ctx.fillRect(mx, my, mw * rate, 3);
     }
 
-    // cooldown ring while open
     if (open) {
       const frac = Math.min(1, (now - breaker.openedAt) / breaker.cooldown);
       ctx.strokeStyle = C.warn; ctx.lineWidth = 2;
