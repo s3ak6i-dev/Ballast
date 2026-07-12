@@ -3,6 +3,7 @@
 **A resilience and cost-control plane for multi-agent AI systems.**
 
 [![CI](https://github.com/s3ak6i-dev/Ballast/actions/workflows/ci.yml/badge.svg)](https://github.com/s3ak6i-dev/Ballast/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/ballast-agents?color=E8602C)](https://pypi.org/project/ballast-agents/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-E8602C)
 ![License: MIT](https://img.shields.io/badge/license-MIT-9c9187)
 ![Status](https://img.shields.io/badge/status-M4%20complete-E8602C)
@@ -76,14 +77,11 @@ Ballast ports the proven answers — circuit breakers, backpressure, graceful de
 ## Quickstart
 
 ```bash
-# core (zero runtime dependencies):
-pip install git+https://github.com/s3ak6i-dev/Ballast
-
-# with the dashboard:
-pip install "ballast-agents[dashboard] @ git+https://github.com/s3ak6i-dev/Ballast"
+pip install ballast-agents                # core: zero runtime dependencies
+pip install "ballast-agents[dashboard]"   # + FastAPI dashboard
 ```
 
-(PyPI release as `ballast-agents` is wired up and ships with the v0.1.0 GitHub release — the import name is `ballast` either way.)
+(The distribution is `ballast-agents`; the import name is `ballast`.)
 
 Wrap a call and configure your thresholds:
 
@@ -258,7 +256,7 @@ Design principles worth knowing before contributing:
 | M3 | Fallback routing + budget tracking | ✅ |
 | M4 | Live dashboard + SQLite event log | ✅ |
 | M4.5 | Async interceptor (`async def` support, cancelling timeouts, async backpressure) · CI · PyPI packaging | ✅ |
-| M5 | Docker packaging ✅ · demo video ✅ · PyPI release + launch 🔜 | ◐ |
+| M5 | Docker packaging ✅ · demo video ✅ · [PyPI release](https://pypi.org/project/ballast-agents/) ✅ · launch 🔜 | ◐ |
 | Later | Redis-backed shared state · Node/TS SDK · YAML policy config | — |
 
 ## Security posture (v1)
