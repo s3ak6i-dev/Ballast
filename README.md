@@ -68,7 +68,7 @@ Ballast ports the proven answers — circuit breakers, backpressure, graceful de
 | 🔌 **Drop-in interceptor** | One decorator (`@guarded`) or context manager (`guard()` / `aguard()`) around any call — tool, LLM API, database. Sync and async, auto-detected |
 | ⚡ **Per-dependency circuit breakers** | Rolling window of success/failure/latency; trips on failure rate *or* p95 latency vs. a learned healthy baseline; half-open probing with exponential-backoff cooldowns |
 | 🚦 **Global backpressure** | Concurrency ceiling with strict-FIFO queueing; sheds excess load instead of collapsing |
-| 🪜 **Fallback chain** | cache → cheaper model → static value → explicit error, in that order, per dependency |
+| 🪜 **Fallback chain** | cache → cheaper model → static value → explicit error, in that order, per dependency; opt-in `fallback_on_error` serves it on individual call failures too |
 | 🧮 **Cost-aware routing** | Rolling-hour budget with soft/hard ceilings; past the soft ceiling, simple requests route to a cheaper model automatically (rules-based difficulty classifier, pluggable) |
 | 💥 **Chaos injection** | Time-boxed failure/latency/corruption rules against the *real* code path — demos double as CI tests |
 | 📊 **Live dashboard** | Breaker states, in-flight/queue charts, cost burn vs. budget, coalescing event feed, one-click demo — over WebSocket |
@@ -124,6 +124,8 @@ async def call_llm(prompt: str) -> str:
 async with ballast.aguard("postgres_db"):   # async context-manager form
     rows = await db.query(...)
 ```
+
+**Reference integration:** [`examples/langgraph_example.py`](examples/langgraph_example.py) — a real LangGraph pipeline surviving a total LLM outage with zero failed invocations (the graph code itself is untouched; the integration is two decorators). With `fallback_on_error=True`, the fallback chain also serves during the breaker's detection window, so callers never see the outage at all.
 
 When `openai_api` degrades, its breaker trips within a handful of calls; while it's open, requests are served by the fallback chain instead of erroring, and the breaker probes its way back to closed once the API recovers. Nothing else in your pipeline changes.
 
@@ -225,8 +227,10 @@ src/ballast/
   eventlog.py      SQLite audit log (attach to any runtime)
   runtime.py       configure() / status() / the global runtime
   dashboard/       FastAPI backend + live web UI + built-in demo swarm
-tests/             96 tests; breaker logic is FakeClock-driven (no sleeps)
-examples/demo.py   terminal demo: swarm → chaos → trip → fallback → recovery
+tests/             100 tests; breaker logic is FakeClock-driven (no sleeps)
+examples/
+  demo.py                terminal demo: swarm → chaos → trip → fallback → recovery
+  langgraph_example.py   reference integration: a LangGraph pipeline surviving an outage
 ```
 
 Design docs in the repo root: [`PRD.md`](PRD.md) (product requirements), [`TechSpec.md`](TechSpec.md) (architecture), [`UISpec.md`](UISpec.md) (dashboard screens & components).
@@ -235,7 +239,7 @@ Design docs in the repo root: [`PRD.md`](PRD.md) (product requirements), [`TechS
 
 ```bash
 pip install -e .[dev,dashboard]
-pytest                      # 96 tests, ~3s
+pytest                      # 100 tests, ~3s
 python examples/demo.py     # terminal demo
 python -m ballast.dashboard # live dashboard
 ```

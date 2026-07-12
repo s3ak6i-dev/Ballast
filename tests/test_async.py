@@ -95,6 +95,16 @@ class TestAsyncGuarded:
         rt.breaker("api").force_open()
         assert await call("q") == "live:q"  # cache rung, real coro untouched
 
+    async def test_fallback_on_error_serves_chain(self):
+        rt = ballast.configure()
+
+        @guarded(dependency="api", fallback="degraded", fallback_on_error=True)
+        async def call():
+            raise ValueError("boom")
+
+        assert await call() == "degraded"
+        assert rt.breaker("api").status()["window"]["failures"] == 1
+
     async def test_timeout_truly_cancels(self):
         rt = ballast.configure()
         finished = []

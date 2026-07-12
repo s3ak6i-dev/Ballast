@@ -86,6 +86,7 @@ def guarded(
     cheaper: Callable[..., Any] | None = None,
     classifier: Any = None,
     cost_fn: Callable[[Any], float] | None = None,
+    fallback_on_error: bool = False,
 ) -> Callable[[F], F]:
     """Decorator wrapping a callable with backpressure + breaker + chaos logic.
 
@@ -93,6 +94,13 @@ def guarded(
     reuse during outages; ``cheaper`` is a callable (same signature) invoked
     for requests the ``classifier`` deems simple enough; ``fallback`` is the
     static last resort. ``cost_fn(result) -> usd`` reports spend to the budget.
+
+    ``fallback_on_error``: by default the chain serves only when a call can't
+    be attempted (breaker open, shed, budget) — an individual call's failure
+    propagates so the caller sees real errors during the breaker's detection
+    window. Set True to serve the chain on call failure too (the failure is
+    still recorded on the breaker); the caller then never sees the outage,
+    at the cost of masking individual errors.
 
     Usage:
         @guarded(dependency="openai_api", timeout=10,
@@ -161,16 +169,20 @@ def guarded(
                             result = await asyncio.wait_for(coroutine, timeout)
                         else:
                             result = await coroutine
-                    except TimeoutError:
+                    except TimeoutError as exc:
                         latency = rt.clock() - start
                         breaker.record_failure(
                             latency, error=f"timeout: cancelled after {timeout}s"
                         )
+                        if fallback_on_error:
+                            return await run_chain("call_failed", exc)
                         raise
                     except asyncio.CancelledError:
                         raise  # outer cancellation: don't blame the dependency
                     except Exception as exc:
                         breaker.record_failure(rt.clock() - start, error=repr(exc))
+                        if fallback_on_error:
+                            return await run_chain("call_failed", exc)
                         raise
                     breaker.record_success(rt.clock() - start)
                     if cache_ttl_s is not None:
@@ -238,6 +250,8 @@ def guarded(
                     result = rt.chaos.apply(dependency, func, *args, **kwargs)
                 except Exception as exc:
                     breaker.record_failure(rt.clock() - start, error=repr(exc))
+                    if fallback_on_error:
+                        return run_chain("call_failed", exc)
                     raise
                 latency = rt.clock() - start
                 if timeout is not None and latency > timeout:

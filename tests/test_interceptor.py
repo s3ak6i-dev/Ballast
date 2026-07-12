@@ -89,6 +89,41 @@ class TestFallback:
         assert call() is None
 
 
+class TestFallbackOnError:
+    def test_failed_call_serves_chain_when_enabled(self):
+        rt = ballast.configure()
+        seen: list = []
+        ballast.subscribe(seen.append)
+
+        @guarded(dependency="api", fallback="degraded", fallback_on_error=True)
+        def call():
+            raise ValueError("boom")
+
+        assert call() == "degraded"
+        assert rt.breaker("api").status()["window"]["failures"] == 1  # still recorded
+        assert fallback_events(seen)[0].detail == {"reason": "call_failed", "rung": "static"}
+
+    def test_default_still_propagates(self):
+        ballast.configure()
+
+        @guarded(dependency="api", fallback="degraded")
+        def call():
+            raise ValueError("boom")
+
+        with pytest.raises(ValueError):
+            call()
+
+    def test_empty_chain_reraises_original(self):
+        ballast.configure()
+
+        @guarded(dependency="api", fallback_on_error=True)
+        def call():
+            raise ValueError("boom")
+
+        with pytest.raises(ValueError, match="boom"):
+            call()
+
+
 class TestTimeout:
     def test_slow_call_recorded_as_failure(self):
         rt = ballast.configure()
