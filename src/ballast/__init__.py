@@ -36,7 +36,7 @@ from .exceptions import (
     QueueTimeoutError,
     RequestShedError,
 )
-from .interceptor import guard, guarded
+from .interceptor import aguard, guard, guarded
 from .runtime import Runtime, configure, get_runtime, record_cost, reset, status
 
 if TYPE_CHECKING:
@@ -51,6 +51,7 @@ __all__ = [
     "record_cost",
     "guarded",
     "guard",
+    "aguard",
     "chaos",
     "subscribe",
     "BudgetTracker",

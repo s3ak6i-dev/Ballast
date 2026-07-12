@@ -1,0 +1,32 @@
+# Publishes to PyPI when a GitHub release is published.
+#
+# Uses PyPI Trusted Publishing (no long-lived tokens). One-time setup on PyPI:
+#   pypi.org → your account → Publishing → add a "pending publisher":
+#     project:  ballast-agents
+#     owner:    s3ak6i-dev    repo: Ballast
+#     workflow: publish.yml   environment: pypi
+# Then create a GitHub release (e.g. tag v0.1.0) and this workflow ships it.
+
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1

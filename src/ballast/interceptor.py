@@ -19,16 +19,25 @@ real dependency:
     → static ``fallback`` value/callable
     → re-raise the original refusal.
 
-`timeout` (sync MVP): a call whose latency exceeds it is recorded as a
-*failure* for breaker purposes even though its result is still returned; true
-cancellation arrives with the async variant.
+``@guarded`` works on both ``def`` and ``async def`` functions — it detects
+coroutine functions and returns an async wrapper that never blocks the event
+loop (async backpressure, async chaos, async-aware fallbacks).
+
+`timeout` semantics differ by flavor:
+    sync  — a call whose latency exceeds it is recorded as a *failure* for
+            breaker purposes, but its result is still returned (threads can't
+            be safely cancelled).
+    async — the call is truly cancelled via asyncio timeout: the breaker
+            records a failure and TimeoutError propagates.
 """
 
 from __future__ import annotations
 
+import asyncio
 import functools
-from contextlib import contextmanager
-from typing import Any, Callable, Iterator, TypeVar
+import inspect
+from contextlib import asynccontextmanager, contextmanager
+from typing import Any, AsyncIterator, Callable, Iterator, TypeVar
 
 from .events import Event, EventType
 from .exceptions import (
@@ -54,6 +63,17 @@ def _emit_fallback(rt: Runtime, dependency: str, reason: str, rung: str) -> None
         dependency=dependency,
         detail={"reason": reason, "rung": rung},
     ))
+
+
+async def _resolve_maybe_async(value_or_fn: Any, args: tuple, kwargs: dict) -> Any:
+    """Resolve a fallback/cheaper that may be a plain value, a sync callable,
+    or an async callable."""
+    if callable(value_or_fn):
+        out = value_or_fn(*args, **kwargs)
+        if inspect.isawaitable(out):
+            return await out
+        return out
+    return value_or_fn
 
 
 def guarded(
@@ -82,6 +102,87 @@ def guarded(
     chosen_classifier = classifier or _default_classifier
 
     def decorate(func: F) -> F:
+        if inspect.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def awrapper(*args: Any, **kwargs: Any) -> Any:
+                rt = get_runtime()
+                breaker = rt.breaker(dependency)
+
+                async def run_chain(reason: str, original: BaseException) -> Any:
+                    if cache_ttl_s is not None:
+                        hit, value = rt.cache.get(dependency, args, kwargs)
+                        if hit:
+                            _emit_fallback(rt, dependency, reason, rung="cache")
+                            return value
+                    if cheaper is not None and chosen_classifier.eligible_for_cheaper(args, kwargs):
+                        _emit_fallback(rt, dependency, reason, rung="cheaper_model")
+                        return await _resolve_maybe_async(cheaper, args, kwargs)
+                    if fallback is not _UNSET:
+                        _emit_fallback(rt, dependency, reason, rung="static")
+                        return await _resolve_maybe_async(fallback, args, kwargs)
+                    raise original
+
+                # 1. Hard budget ceiling — checked before consuming any capacity.
+                if rt.budget.hard_exceeded:
+                    exceeded = BudgetExceededError(rt.budget.spent(), rt.budget.ceiling)
+                    if rt.config.budget_hard_behavior == "refuse":
+                        raise exceeded
+                    return await run_chain("budget_hard", exceeded)
+
+                # 2. Backpressure — never blocks the event loop.
+                try:
+                    await rt.controller.acquire_async(queue_timeout_s)
+                except (RequestShedError, QueueTimeoutError) as exc:
+                    return await run_chain("shed", exc)
+
+                try:
+                    # 3. Breaker.
+                    if not breaker.try_acquire():
+                        return await run_chain(
+                            "breaker_open",
+                            CircuitOpenError(dependency, breaker.status()["cooldown_remaining_s"]),
+                        )
+
+                    # 4. Soft budget ceiling — downgrade eligible calls proactively.
+                    if (
+                        rt.budget.soft_exceeded
+                        and cheaper is not None
+                        and chosen_classifier.eligible_for_cheaper(args, kwargs)
+                    ):
+                        _emit_fallback(rt, dependency, "budget_soft", rung="cheaper_model")
+                        return await _resolve_maybe_async(cheaper, args, kwargs)
+
+                    # 5–6. The real call. Unlike the sync flavor, `timeout`
+                    # truly cancels here.
+                    start = rt.clock()
+                    try:
+                        coroutine = rt.chaos.apply_async(dependency, func, *args, **kwargs)
+                        if timeout is not None:
+                            result = await asyncio.wait_for(coroutine, timeout)
+                        else:
+                            result = await coroutine
+                    except TimeoutError:
+                        latency = rt.clock() - start
+                        breaker.record_failure(
+                            latency, error=f"timeout: cancelled after {timeout}s"
+                        )
+                        raise
+                    except asyncio.CancelledError:
+                        raise  # outer cancellation: don't blame the dependency
+                    except Exception as exc:
+                        breaker.record_failure(rt.clock() - start, error=repr(exc))
+                        raise
+                    breaker.record_success(rt.clock() - start)
+                    if cache_ttl_s is not None:
+                        rt.cache.put(dependency, args, kwargs, result, cache_ttl_s)
+                    if cost_fn is not None:
+                        rt.budget.record(cost_fn(result), dependency)
+                    return result
+                finally:
+                    rt.controller.release()
+
+            return awrapper  # type: ignore[return-value]
+
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             rt = get_runtime()
@@ -173,6 +274,36 @@ def guard(dependency: str, *, queue_timeout_s: float | None = None) -> Iterator[
     rt = get_runtime()
     breaker = rt.breaker(dependency)
     rt.controller.acquire(queue_timeout_s)
+    try:
+        if not breaker.try_acquire():
+            raise CircuitOpenError(dependency, breaker.status()["cooldown_remaining_s"])
+        start = rt.clock()
+        try:
+            yield
+        except Exception as exc:
+            breaker.record_failure(rt.clock() - start, error=repr(exc))
+            raise
+        breaker.record_success(rt.clock() - start)
+    finally:
+        rt.controller.release()
+
+
+@asynccontextmanager
+async def aguard(dependency: str, *, queue_timeout_s: float | None = None) -> AsyncIterator[None]:
+    """Async twin of guard() for non-function-shaped call sites.
+
+    Usage:
+        async with ballast.aguard("postgres_db"):
+            result = await db.query(...)
+
+    Same semantics as guard(): block wall time is the recorded latency, an
+    escaping exception records a failure, and an open breaker raises
+    CircuitOpenError before the block runs. Backpressure waits without
+    blocking the event loop.
+    """
+    rt = get_runtime()
+    breaker = rt.breaker(dependency)
+    await rt.controller.acquire_async(queue_timeout_s)
     try:
         if not breaker.try_acquire():
             raise CircuitOpenError(dependency, breaker.status()["cooldown_remaining_s"])

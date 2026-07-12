@@ -224,8 +224,8 @@
          AI agent pipeline — and chaos testing to prove they work. One Python decorator.
          No orchestrator rewrite.</p>
       <div class="hero-cta">
-        <span class="install"><span class="dollar">$</span> pip install ballast
-          <button data-copy="pip install ballast" aria-label="Copy install command">copy</button></span>
+        <span class="install"><span class="dollar">$</span> pip install git+https://github.com/s3ak6i-dev/Ballast
+          <button data-copy="pip install git+https://github.com/s3ak6i-dev/Ballast" aria-label="Copy install command">copy</button></span>
         <a class="btn ghost" href="https://github.com/s3ak6i-dev/Ballast">Star on GitHub</a>
       </div>
     </div>
@@ -449,15 +449,18 @@
       </details>
       <details>
         <summary>Does it support async?</summary>
-        <p>Not yet — the interceptor is sync/thread-based today. An <code>async def</code>
-           variant of <code>@guarded</code> is the top of the roadmap, since most agent
-           frameworks are asyncio-first.</p>
+        <p>Yes. <code>@guarded</code> detects <code>async def</code> functions automatically —
+           backpressure waits without blocking the event loop, fallbacks can be async
+           callables, and <code>timeout</code> becomes a <em>real</em> cancelling timeout
+           (unlike the sync flavor, where a thread can't be safely killed).
+           <code>aguard()</code> is the async context-manager form.</p>
       </details>
       <details>
         <summary>Is it production-ready?</summary>
-        <p>It's a well-tested v1 (81 deterministic tests) that's honest about its limits:
-           single-process in-memory state, sync-only, localhost dashboard with no auth.
-           Read the security section in the README before deploying anything.</p>
+        <p>It's a well-tested v1 (96 deterministic tests, CI on Linux and Windows across
+           Python 3.11–3.13) that's honest about its limits: single-process in-memory
+           state and a localhost dashboard with no auth. Read the security section in
+           the README before deploying anything.</p>
       </details>
     </div>
   </div>
@@ -469,8 +472,8 @@
     <h2>Give your swarm some ballast.</h2>
     <p class="lede" style="margin: 14px auto 0">Clone it, run the built-in incident demo,
        and watch a breaker trip and recover in your browser — no API keys required.</p>
-    <span class="install"><span class="dollar">$</span> pip install -e .[dashboard] &amp;&amp; python -m ballast.dashboard
-      <button data-copy="pip install -e .[dashboard] && python -m ballast.dashboard" aria-label="Copy dashboard command">copy</button></span>
+    <span class="install"><span class="dollar">$</span> pip install "ballast-agents[dashboard] @ git+https://github.com/s3ak6i-dev/Ballast" &amp;&amp; python -m ballast.dashboard
+      <button data-copy='pip install "ballast-agents[dashboard] @ git+https://github.com/s3ak6i-dev/Ballast" && python -m ballast.dashboard' aria-label="Copy dashboard command">copy</button></span>
     <div class="hero-cta" style="justify-content: center">
       <a class="btn" href="https://github.com/s3ak6i-dev/Ballast">View on GitHub</a>
       <a class="btn ghost" href="https://github.com/s3ak6i-dev/Ballast#readme">Read the docs</a>

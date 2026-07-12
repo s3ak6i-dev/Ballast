@@ -2,8 +2,8 @@
 
 **A resilience and cost-control plane for multi-agent AI systems.**
 
+[![CI](https://github.com/s3ak6i-dev/Ballast/actions/workflows/ci.yml/badge.svg)](https://github.com/s3ak6i-dev/Ballast/actions/workflows/ci.yml)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-E8602C)
-![Tests](https://img.shields.io/badge/tests-81%20passing-53a868)
 ![License: MIT](https://img.shields.io/badge/license-MIT-9c9187)
 ![Status](https://img.shields.io/badge/status-M4%20complete-E8602C)
 
@@ -64,7 +64,7 @@ Ballast ports the proven answers — circuit breakers, backpressure, graceful de
 
 | | |
 |---|---|
-| 🔌 **Drop-in interceptor** | One decorator (`@guarded`) or context manager (`guard()`) around any call — tool, LLM API, database |
+| 🔌 **Drop-in interceptor** | One decorator (`@guarded`) or context manager (`guard()` / `aguard()`) around any call — tool, LLM API, database. Sync and async, auto-detected |
 | ⚡ **Per-dependency circuit breakers** | Rolling window of success/failure/latency; trips on failure rate *or* p95 latency vs. a learned healthy baseline; half-open probing with exponential-backoff cooldowns |
 | 🚦 **Global backpressure** | Concurrency ceiling with strict-FIFO queueing; sheds excess load instead of collapsing |
 | 🪜 **Fallback chain** | cache → cheaper model → static value → explicit error, in that order, per dependency |
@@ -76,9 +76,14 @@ Ballast ports the proven answers — circuit breakers, backpressure, graceful de
 ## Quickstart
 
 ```bash
-pip install -e .            # core: zero runtime dependencies
-pip install -e .[dashboard] # + FastAPI dashboard
+# core (zero runtime dependencies):
+pip install git+https://github.com/s3ak6i-dev/Ballast
+
+# with the dashboard:
+pip install "ballast-agents[dashboard] @ git+https://github.com/s3ak6i-dev/Ballast"
 ```
+
+(PyPI release as `ballast-agents` is wired up and ships with the v0.1.0 GitHub release — the import name is `ballast` either way.)
 
 Wrap a call and configure your thresholds:
 
@@ -109,6 +114,17 @@ def call_llm(prompt: str) -> str:
 
 with ballast.guard("postgres_db"):          # context-manager form
     rows = db.query(...)
+```
+
+**Async works out of the box** — `@guarded` detects `async def` and never blocks the event loop; `timeout` becomes a *real* cancelling timeout in async:
+
+```python
+@guarded(dependency="openai_api", timeout=10, fallback="degraded")
+async def call_llm(prompt: str) -> str:
+    return await client.chat.completions.create(...)
+
+async with ballast.aguard("postgres_db"):   # async context-manager form
+    rows = await db.query(...)
 ```
 
 When `openai_api` degrades, its breaker trips within a handful of calls; while it's open, requests are served by the fallback chain instead of erroring, and the breaker probes its way back to closed once the API recovers. Nothing else in your pipeline changes.
@@ -209,7 +225,7 @@ src/ballast/
   eventlog.py      SQLite audit log (attach to any runtime)
   runtime.py       configure() / status() / the global runtime
   dashboard/       FastAPI backend + live web UI + built-in demo swarm
-tests/             81 tests; breaker logic is FakeClock-driven (no sleeps)
+tests/             96 tests; breaker logic is FakeClock-driven (no sleeps)
 examples/demo.py   terminal demo: swarm → chaos → trip → fallback → recovery
 ```
 
@@ -219,7 +235,7 @@ Design docs in the repo root: [`PRD.md`](PRD.md) (product requirements), [`TechS
 
 ```bash
 pip install -e .[dev,dashboard]
-pytest                      # 81 tests, ~2s
+pytest                      # 96 tests, ~3s
 python examples/demo.py     # terminal demo
 python -m ballast.dashboard # live dashboard
 ```
@@ -239,8 +255,9 @@ Design principles worth knowing before contributing:
 | M2 | Chaos injection + terminal demo | ✅ |
 | M3 | Fallback routing + budget tracking | ✅ |
 | M4 | Live dashboard + SQLite event log | ✅ |
+| M4.5 | Async interceptor (`async def` support, cancelling timeouts, async backpressure) · CI · PyPI packaging | ✅ |
 | M5 | Docker packaging, demo video, launch | 🔜 |
-| Later | Redis-backed shared state · async/`await` interceptor · Node/TS SDK · YAML policy config | — |
+| Later | Redis-backed shared state · Node/TS SDK · YAML policy config | — |
 
 ## Security posture (v1)
 

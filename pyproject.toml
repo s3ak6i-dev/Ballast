@@ -3,17 +3,33 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ballast"
+name = "ballast-agents"          # PyPI distribution name; the import is `ballast`
 version = "0.1.0"
-description = "Resilience and cost-control plane for multi-agent AI systems"
+description = "Resilience and cost-control plane for multi-agent AI systems: circuit breakers, backpressure, cost-aware fallbacks, and chaos testing"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Surya" }]
-keywords = ["agents", "resilience", "circuit-breaker", "backpressure", "chaos-engineering"]
+keywords = ["agents", "resilience", "circuit-breaker", "backpressure", "chaos-engineering", "llm", "fallback", "cost-control"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Framework :: AsyncIO",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Distributed Computing",
+]
+
+[project.urls]
+Homepage = "https://s3ak6i-dev.github.io/Ballast/"
+Repository = "https://github.com/s3ak6i-dev/Ballast"
+Issues = "https://github.com/s3ak6i-dev/Ballast/issues"
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "httpx>=0.27"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "httpx>=0.27"]
 dashboard = ["fastapi>=0.110", "uvicorn>=0.29"]
 
 [tool.setuptools.packages.find]

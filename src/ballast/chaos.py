@@ -11,12 +11,13 @@ enforced) hard-capped at MAX_INJECTION_S — no indefinite faults (UISpec §3.3)
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import random
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Coroutine
 
 from ._clock import Clock, monotonic
 from .events import Event, EventType
@@ -125,6 +126,38 @@ class ChaosInjector:
                 time.sleep(extra)
         else:
             result = func(*args, **kwargs)
+
+        corruption = rules.get("corruption")
+        if corruption is not None and self._rng.random() < corruption.value:
+            result = self._corrupt(result)
+        return result
+
+    async def apply_async(
+        self, dependency: str, func: Callable[..., Coroutine[Any, Any, Any]],
+        *args: Any, **kwargs: Any,
+    ) -> Any:
+        """Async twin of apply(): awaits `func` and uses asyncio.sleep for
+        injected latency so the event loop is never blocked."""
+        if not self.enabled:
+            return await func(*args, **kwargs)
+        rules = self._active_rules(dependency)
+        if not rules:
+            return await func(*args, **kwargs)
+
+        failure = rules.get("failure")
+        if failure is not None and self._rng.random() < failure.value:
+            raise ChaosError(dependency)
+
+        latency = rules.get("latency")
+        if latency is not None:
+            start = self._clock()
+            result = await func(*args, **kwargs)
+            elapsed = self._clock() - start
+            extra = max(0.0, elapsed * (latency.value - 1.0))
+            if extra:
+                await asyncio.sleep(extra)
+        else:
+            result = await func(*args, **kwargs)
 
         corruption = rules.get("corruption")
         if corruption is not None and self._rng.random() < corruption.value:
