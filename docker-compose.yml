@@ -1,0 +1,12 @@
+# docker compose up --build   →   dashboard on http://localhost:8080
+# Click "Run demo scenario" to watch a built-in incident — no API keys needed.
+services:
+  ballast:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ballast-data:/data
+
+volumes:
+  ballast-data:

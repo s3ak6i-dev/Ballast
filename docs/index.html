@@ -151,6 +151,12 @@
   }
   .term .row { opacity: 0; transform: translateY(4px); transition: opacity .4s, transform .4s; white-space: pre; }
   .term .row.show { opacity: 1; transform: none; }
+
+  /* ---------- dashboard showcase ---------- */
+  .showcase {
+    display: block; width: 100%; margin-top: 30px;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--bg2);
+  }
   @media (prefers-reduced-motion: reduce) {
     .term .row { opacity: 1; transform: none; transition: none; }
   }
@@ -371,6 +377,23 @@
       <div class="row">&nbsp;</div>
       <div class="row">calls: 10,466  |  live: 4,553  |  fallback: 5,901  |  errors: 12</div>
     </div>
+  </div>
+</section>
+
+<!-- ================= DASHBOARD ================= -->
+<section id="dashboard">
+  <div class="wrap">
+    <div class="eyebrow">The dashboard</div>
+    <h2>Watch your swarm survive, live.</h2>
+    <p class="lede">Breaker cards with cooldown countdowns, traffic and cost-vs-budget charts,
+       and a coalescing event feed — streamed over WebSocket. This is a real recorded incident
+       from the built-in demo (chaos at 0:08, recovery at 0:17):</p>
+    <video class="showcase" muted loop playsinline controls preload="metadata"
+           src="assets/dashboard-demo.mp4"
+           aria-label="Screen recording of the Ballast dashboard detecting and recovering from an injected failure"></video>
+    <p style="color: var(--faint); font-size: 13.5px; margin-top: 14px">
+      <code>docker compose up</code> → <a href="http://localhost:8080">localhost:8080</a>,
+      or <code>python -m ballast.dashboard</code>. The demo needs no API keys.</p>
   </div>
 </section>
 
@@ -753,6 +776,19 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
 
   log("40 agents calling one API through a Ballast breaker. Try killing it.", "");
   requestAnimationFrame(draw);
+})();
+
+/* ============ dashboard video: autoplay when visible (unless reduced motion) ============ */
+(() => {
+  const video = document.querySelector(".showcase");
+  if (!video || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const io = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) video.play().catch(() => {});
+      else video.pause();
+    }
+  }, { threshold: 0.35 });
+  io.observe(video);
 })();
 
 /* ============ chaos terminal reveal ============ */

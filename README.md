@@ -154,6 +154,8 @@ detection: breaker tripped 0.02s after chaos began (target: < 2s)
 ## The dashboard
 
 ```bash
+docker compose up --build          # → http://localhost:8080, zero setup
+# or, without Docker:
 pip install -e .[dashboard]
 python -m ballast.dashboard        # → http://127.0.0.1:8080
 ```
@@ -256,7 +258,7 @@ Design principles worth knowing before contributing:
 | M3 | Fallback routing + budget tracking | ✅ |
 | M4 | Live dashboard + SQLite event log | ✅ |
 | M4.5 | Async interceptor (`async def` support, cancelling timeouts, async backpressure) · CI · PyPI packaging | ✅ |
-| M5 | Docker packaging, demo video, launch | 🔜 |
+| M5 | Docker packaging ✅ · demo video ✅ · PyPI release + launch 🔜 | ◐ |
 | Later | Redis-backed shared state · Node/TS SDK · YAML policy config | — |
 
 ## Security posture (v1)

@@ -25,3 +25,20 @@ jobs:
         run: pip install -e ".[dev,dashboard]"
       - name: Test
         run: pytest -q
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t ballast .
+      - name: Smoke test
+        run: |
+          docker run -d --rm -p 8080:8080 --name ballast ballast
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/api/status && break
+            sleep 1
+          done
+          curl -sf http://localhost:8080/api/status | grep -q session_id
+          docker stop ballast
